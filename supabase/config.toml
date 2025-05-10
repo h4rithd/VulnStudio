@@ -1,0 +1,5 @@
+
+project_id = "<REPLACE_PROJECTID_HERE>"
+
+[functions.create-admin-user]
+verify_jwt = false
