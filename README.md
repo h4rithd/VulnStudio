@@ -45,9 +45,7 @@ A live demo is available at **[vulnstudio.com](https://vulnstudio.com)**. Please
 ## 📬 Feedback  
 Your feedback and contributions are highly appreciated. Let’s build something great together!  
 
-## 📄 License  
-This project is licensed under the MIT License.  
 
 ⚠️ **Security Note:** My original code included some hardcoded secrets used during development. This repository has been cleaned to remove all sensitive information. 
 
-#VulnStudio #PenetrationTesting #Cybersecurity #OpenSource #WebAppDevelopment  
+#VulnStudio #PenetrationTesting #Cybersecurity #OpenSource #h4rithd #HarithD
