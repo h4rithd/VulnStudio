@@ -8,26 +8,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Reports } from '@/types/database.types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import { exportProjectToZip } from '@/utils/projectExport';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle, 
-  AlertDialogTrigger 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { ChevronDown, ChevronLeft, FileText, PenLine, Plus, Shield, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, FileText, PenLine, Plus, Shield, Trash2, Archive } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -71,7 +72,7 @@ const ProjectDetails = () => {
 
   useEffect(() => {
     if (!projectId) return;
-    
+
     const fetchProjectData = async () => {
       try {
         setLoading(true);
@@ -82,7 +83,7 @@ const ProjectDetails = () => {
           .single();
 
         if (error) throw error;
-        
+
         setProjectData(data);
 
         // Fetch vulnerabilities for this project
@@ -93,7 +94,7 @@ const ProjectDetails = () => {
           .order('display_order', { ascending: true });
 
         if (vulnError) throw vulnError;
-        
+
         setVulnerabilities(vulnData || []);
       } catch (error: any) {
         console.error('Error loading project data:', error);
@@ -111,119 +112,119 @@ const ProjectDetails = () => {
   }, [projectId, toast]);
 
   // Function to sort vulnerabilities by severity
-    const sortVulnerabilitiesBySeverity = (vulnerabilities: Vulnerability[]): Vulnerability[] => {
-      return [...vulnerabilities].sort((a, b) => {
-        // First sort by severity
-        const severityComparison = SEVERITY_ORDER[a.severity as keyof typeof SEVERITY_ORDER] - 
-                                  SEVERITY_ORDER[b.severity as keyof typeof SEVERITY_ORDER];
-        
-        // If same severity, sort by display_order
-        if (severityComparison === 0) {
-          return (a.display_order || 0) - (b.display_order || 0);
-        }
-        
-        return severityComparison;
-      });
-    };
-  
-    // Function to generate vulnerability IDs
-    const generateVulnerabilityIds = async (sortedVulns: Vulnerability[]) => {
-      if (!project || !project.title) return sortedVulns;
-  
-      // Get project prefix (first 3 letters uppercase)
-      const projectPrefix = project.title.substring(0, 3).toUpperCase();
-      
-      // Group vulnerabilities by severity
-      const vulnerabilitiesBySeverity: Record<string, Vulnerability[]> = {
-        'critical': [],
-        'high': [],
-        'medium': [],
-        'low': [],
-        'info': []
-      };
-      
-      sortedVulns.forEach(vuln => {
-        if (vuln.severity) {
-          vulnerabilitiesBySeverity[vuln.severity].push(vuln);
-        }
-      });
-      
-      // Generate new vulnerability IDs
-      const updatedVulns = [...sortedVulns];
-      let updatedIds: Record<string, string> = {};
-      
-      for (const severity in vulnerabilitiesBySeverity) {
-        const vulns = vulnerabilitiesBySeverity[severity];
-        const severityPrefix = severity.charAt(0).toUpperCase();
-        
-        vulns.forEach((vuln, index) => {
-          // Format: PREFIX.S.## (e.g., H4R.C.01)
-          const newId = `${projectPrefix}.${severityPrefix}.${(index + 1).toString().padStart(2, '0')}`;
-          
-          // Store the mapping of vulnerability id to new vulnerability_id
-          if (vuln.id) {
-            updatedIds[vuln.id] = newId;
-          }
-        });
+  const sortVulnerabilitiesBySeverity = (vulnerabilities: Vulnerability[]): Vulnerability[] => {
+    return [...vulnerabilities].sort((a, b) => {
+      // First sort by severity
+      const severityComparison = SEVERITY_ORDER[a.severity as keyof typeof SEVERITY_ORDER] -
+        SEVERITY_ORDER[b.severity as keyof typeof SEVERITY_ORDER];
+
+      // If same severity, sort by display_order
+      if (severityComparison === 0) {
+        return (a.display_order || 0) - (b.display_order || 0);
       }
-      
-      // Update vulnerability IDs in database if they've changed
-      for (const vulnId in updatedIds) {
-        const newVulnId = updatedIds[vulnId];
-        const vuln = updatedVulns.find(v => v.id === vulnId);
-        
-        if (vuln && vuln.vulnerability_id !== newVulnId) {
-          await supabase
-            .from('vulnerabilities')
-            .update({ vulnerability_id: newVulnId })
-            .eq('id', vulnId);
-            
-          // Update local state as well
-          const vulnIndex = updatedVulns.findIndex(v => v.id === vulnId);
-          if (vulnIndex >= 0) {
-            updatedVulns[vulnIndex] = { ...updatedVulns[vulnIndex], vulnerability_id: newVulnId };
-          }
+
+      return severityComparison;
+    });
+  };
+
+  // Function to generate vulnerability IDs
+  const generateVulnerabilityIds = async (sortedVulns: Vulnerability[]) => {
+    if (!project || !project.title) return sortedVulns;
+
+    // Get project prefix (first 3 letters uppercase)
+    const projectPrefix = project.title.substring(0, 3).toUpperCase();
+
+    // Group vulnerabilities by severity
+    const vulnerabilitiesBySeverity: Record<string, Vulnerability[]> = {
+      'critical': [],
+      'high': [],
+      'medium': [],
+      'low': [],
+      'info': []
+    };
+
+    sortedVulns.forEach(vuln => {
+      if (vuln.severity) {
+        vulnerabilitiesBySeverity[vuln.severity].push(vuln);
+      }
+    });
+
+    // Generate new vulnerability IDs
+    const updatedVulns = [...sortedVulns];
+    let updatedIds: Record<string, string> = {};
+
+    for (const severity in vulnerabilitiesBySeverity) {
+      const vulns = vulnerabilitiesBySeverity[severity];
+      const severityPrefix = severity.charAt(0).toUpperCase();
+
+      vulns.forEach((vuln, index) => {
+        // Format: PREFIX.S.## (e.g., H4R.C.01)
+        const newId = `${projectPrefix}.${severityPrefix}.${(index + 1).toString().padStart(2, '0')}`;
+
+        // Store the mapping of vulnerability id to new vulnerability_id
+        if (vuln.id) {
+          updatedIds[vuln.id] = newId;
+        }
+      });
+    }
+
+    // Update vulnerability IDs in database if they've changed
+    for (const vulnId in updatedIds) {
+      const newVulnId = updatedIds[vulnId];
+      const vuln = updatedVulns.find(v => v.id === vulnId);
+
+      if (vuln && vuln.vulnerability_id !== newVulnId) {
+        await supabase
+          .from('vulnerabilities')
+          .update({ vulnerability_id: newVulnId })
+          .eq('id', vulnId);
+
+        // Update local state as well
+        const vulnIndex = updatedVulns.findIndex(v => v.id === vulnId);
+        if (vulnIndex >= 0) {
+          updatedVulns[vulnIndex] = { ...updatedVulns[vulnIndex], vulnerability_id: newVulnId };
         }
       }
-      
-      return updatedVulns;
-    };
+    }
+
+    return updatedVulns;
+  };
 
   const handleDragEnd = async (result: any) => {
     // If dropped outside the list, do nothing
     if (!result.destination) return;
-    
+
     // If position hasn't changed, do nothing
     if (result.source.index === result.destination.index) return;
-    
+
     // Reorder the vulnerabilities in the state for immediate UI update
     const items = Array.from(vulnerabilities);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
-    
+
     // Update display order
     const updatedItems = items.map((item, index) => ({
       ...item,
       display_order: index
     }));
-    
+
     setVulnerabilities(updatedItems);
-    
+
     // Update in database
     try {
       setReordering(true);
-      const updatePromises = updatedItems.map(item => 
+      const updatePromises = updatedItems.map(item =>
         supabase
           .from('vulnerabilities')
           .update({ display_order: item.display_order })
           .eq('id', item.id)
       );
-      
+
       // await Promise.all(updatePromises);
       const sortedVulns = sortVulnerabilitiesBySeverity(updatedItems);
       const updatedVulns = await generateVulnerabilityIds(sortedVulns);
       setVulnerabilities(updatedVulns);
-      
+
       toast({
         title: 'Success',
         description: 'Vulnerability order updated',
@@ -242,37 +243,37 @@ const ProjectDetails = () => {
 
   const handleDeleteVulnerability = async () => {
     if (!deleteVulnId) return;
-    
+
     try {
       setDeleteLoading(true);
-      
+
       // First delete any attachments related to this vulnerability
       const { error: attachmentError } = await supabase
         .from('attachments')
         .delete()
         .eq('vulnerability_id', deleteVulnId);
-      
+
       if (attachmentError) {
         console.error("Error deleting attachments:", attachmentError);
         throw attachmentError;
       }
-      
+
       // Then delete the vulnerability
       const { error } = await supabase
         .from('vulnerabilities')
         .delete()
         .eq('id', deleteVulnId);
-        
+
       if (error) throw error;
-      
+
       // Remove from state
       setVulnerabilities(prev => prev.filter(v => v.id !== deleteVulnId));
-      
+
       toast({
         title: 'Success',
         description: 'Vulnerability deleted successfully',
       });
-      
+
     } catch (error: any) {
       console.error('Failed to delete vulnerability:', error);
       toast({
@@ -289,35 +290,35 @@ const ProjectDetails = () => {
   const handleToggleResolved = async (vuln: Vulnerability) => {
     try {
       const newStatus = !vuln.current_status;
-      
+
       // Update the status in the database
       const { error } = await supabase
         .from('vulnerabilities')
-        .update({ 
+        .update({
           current_status: newStatus,
           // If marking as resolved for the first time, set the retest_date to today
           ...(newStatus && !vuln.retest_date ? { retest_date: new Date().toISOString() } : {})
         })
         .eq('id', vuln.id);
-        
+
       if (error) throw error;
-      
+
       // Update in state
-      setVulnerabilities(prev => 
-        prev.map(v => v.id === vuln.id ? { 
-          ...v, 
+      setVulnerabilities(prev =>
+        prev.map(v => v.id === vuln.id ? {
+          ...v,
           current_status: newStatus,
           ...(newStatus && !vuln.retest_date ? { retest_date: new Date().toISOString() } : {})
         } : v)
       );
-      
+
       toast({
         title: 'Success',
-        description: newStatus 
+        description: newStatus
           ? 'Vulnerability marked as resolved'
           : 'Vulnerability marked as open',
       });
-      
+
     } catch (error: any) {
       console.error('Failed to update vulnerability status:', error);
       toast({
@@ -327,6 +328,36 @@ const ProjectDetails = () => {
       });
     }
   };
+
+  const handleExportProject = async (projectId: string, title: string) => {
+    try {
+      // Export the project as a zip file
+      const zipBlob = await exportProjectToZip(projectId!);
+
+      // Create a download link
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      // link.download = `abc_export.zip`;
+      link.download = `${title.replace(/\s+/g, '_')}_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Successful',
+        description: 'Project has been exported successfully'
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: error.message || 'Failed to export project',
+        variant: 'destructive',
+      });
+    }
+  }
 
   if (loading) {
     return (
@@ -382,53 +413,58 @@ const ProjectDetails = () => {
               Edit Project
             </Link>
           </Button>
+          <Button variant="outline" size="sm"
+            onClick={() => handleExportProject(projectData.id, projectData.title)}>
+            <Archive className="mr-2 h-4 w-4" />
+            <span>Export Report</span>
+          </Button>
         </div>
       </div>
 
       <h1 className="text-3xl font-bold mb-2">{projectData.title}</h1>
       <div className="grid grid-cols-2 gap-4 mb-6 pt-5">
-          <CardContent>
-            <dl className="divide-y">
-              <div className="py-2 flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">Start Date:</dt>
-                <dd className="text-sm">{projectData.start_date}</dd>
-              </div>
-              <div className="py-2 flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">End Date:</dt>
-                <dd className="text-sm">{projectData.end_date}</dd>
-              </div>
-              <div className="py-2 flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">Preparer:</dt>
-                <dd className="text-sm">{projectData.preparer}</dd>
-              </div>
-              <div className="py-2 flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">Reviewer:</dt>
-                <dd className="text-sm">{projectData.reviewer}</dd>
-              </div>
-              <div className="py-2 flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">Version:</dt>
-                <dd className="text-sm">{projectData.version}</dd>
-              </div>
-          
-            </dl>
-          </CardContent>
+        <CardContent>
+          <dl className="divide-y">
+            <div className="py-2 flex justify-between">
+              <dt className="text-sm font-medium text-muted-foreground">Start Date:</dt>
+              <dd className="text-sm">{projectData.start_date}</dd>
+            </div>
+            <div className="py-2 flex justify-between">
+              <dt className="text-sm font-medium text-muted-foreground">End Date:</dt>
+              <dd className="text-sm">{projectData.end_date}</dd>
+            </div>
+            <div className="py-2 flex justify-between">
+              <dt className="text-sm font-medium text-muted-foreground">Preparer:</dt>
+              <dd className="text-sm">{projectData.preparer}</dd>
+            </div>
+            <div className="py-2 flex justify-between">
+              <dt className="text-sm font-medium text-muted-foreground">Reviewer:</dt>
+              <dd className="text-sm">{projectData.reviewer}</dd>
+            </div>
+            <div className="py-2 flex justify-between">
+              <dt className="text-sm font-medium text-muted-foreground">Version:</dt>
+              <dd className="text-sm">{projectData.version}</dd>
+            </div>
 
-          <CardContent>
-            <dl className="divide-y">
-              {projectData.scope && projectData.scope.length > 0 ? (
-                <div>
-                  {projectData.scope.map((item: any, index: number) => (
-                    <div key={index} className="border p-4 rounded-md">
-                       <dt className="text-sm font-medium text-muted-foreground">Project scope:</dt>
-                       <dd className="text-sm">{item.value}</dd>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-4">No scope items defined for this project.</p>
-              )}
-            </dl>
-          </CardContent>
+          </dl>
+        </CardContent>
+
+        <CardContent>
+          <dl className="divide-y">
+            {projectData.scope && projectData.scope.length > 0 ? (
+              <div>
+                {projectData.scope.map((item: any, index: number) => (
+                  <div key={index} className="border p-4 rounded-md">
+                    <dt className="text-sm font-medium text-muted-foreground">Project scope:</dt>
+                    <dd className="text-sm">{item.value}</dd>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-4">No scope items defined for this project.</p>
+            )}
+          </dl>
+        </CardContent>
       </div>
 
       <Tabs defaultValue="vulnerabilities" className="w-full" onValueChange={setActiveTab}>
@@ -442,7 +478,7 @@ const ProjectDetails = () => {
               </Link>
             </Button>
           </div>
-        
+
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="vulnerabilities">
               {(provided) => (
@@ -472,20 +508,20 @@ const ProjectDetails = () => {
                                       <span className="block w-4 h-0.5 bg-gray-300"></span>
                                       <span className="block w-4 h-0.5 bg-gray-300"></span>
                                       <span className="block w-4 h-0.5 bg-gray-300"></span>
-                                    
+
                                     </div>
                                   </div>
                                   <div>
                                     <CardTitle className="text-lg flex items-center gap-2">
-                                      
+
                                       {vuln.vulnerability_id && (
                                         <span className="font-mono text-sm bg-muted px-1.5 py-0.5 rounded">
                                           {vuln.vulnerability_id}
                                         </span>
                                       )}
-                                      
+
                                       {vuln.title}
-                                      
+
                                       {vuln.current_status && (
                                         <Badge variant="outline" className="text-green-600 border-green-600">
                                           Resolved
@@ -538,11 +574,11 @@ const ProjectDetails = () => {
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction 
+                                          <AlertDialogAction
                                             onClick={(e) => {
                                               e.preventDefault();
                                               handleDeleteVulnerability();
-                                            }} 
+                                            }}
                                             className="bg-red-600"
                                             disabled={deleteLoading}
                                           >
@@ -562,6 +598,11 @@ const ProjectDetails = () => {
                                 </DropdownMenu>
                               </div>
                             </CardHeader>
+                            {/* <CardContent className="py-2">
+                              <p className="line-clamp-2 text-sm text-muted-foreground">
+                                {vuln.background || vuln.details}
+                              </p>
+                            </CardContent> */}
                           </Card>
                         )}
                       </Draggable>
@@ -583,19 +624,17 @@ const ProjectDetails = () => {
                   )}
                   {provided.placeholder}
                 </div>
-                
-               
+
+
               )}
             </Droppable>
-            
+
           </DragDropContext>
-    
-        </TabsContent>  
+
+        </TabsContent>
       </Tabs>
     </MainLayout>
   );
 };
 
 export default ProjectDetails;
-
-
