@@ -1,184 +1,313 @@
-
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
-import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
+import { Reports, Vulnerabilities } from '@/types/database.types';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, FileDown } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { DownloadDropdown } from '@/components/report/DownloadDropdown';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import html2pdf from 'html2pdf.js';
+import { htmlToWord } from '@/lib/htmlToWord';
+import { Button } from '@/components/ui/button';
+import { exportProjectToZip } from '@/utils/projectExport';
 import { ReportPreview } from '@/components/report/ReportPreview';
-import { ReportGenerator } from '@/services/ReportGenerator';
-import { Spinner } from '@/components/ui/spinner';
 
 const ReportView = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [projectData, setProjectData] = useState<any>(null);
+  const [project, setProject] = useState<Reports | null>(null);
   const [vulnerabilities, setVulnerabilities] = useState<any[]>([]);
-  const [htmlContent, setHtmlContent] = useState<string>('');
-  const [markdownContent, setMarkdownContent] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<string>('preview');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [projectData, setProjectData] = useState<any>(null);
 
   useEffect(() => {
-    if (!projectId) return;
-    
     const fetchProjectData = async () => {
-      setLoading(true);
+      if (!projectId) return;
+
       try {
-        // Fetch project data
+        setIsLoading(true);
+        
+        // Fetch project details
         const { data: projectData, error: projectError } = await supabase
           .from('reports')
           .select('*')
           .eq('id', projectId)
           .single();
-
+        
         if (projectError) throw projectError;
         setProjectData(projectData);
-
-        // Fetch vulnerabilities with ALL columns including poc_images and retest_images
+        setProject(projectData);
+        
+        // Fetch vulnerabilities
         const { data: vulnData, error: vulnError } = await supabase
           .from('vulnerabilities')
           .select('*')
           .eq('report_id', projectId)
-          .order('display_order', { ascending: true });
-
+          .order('severity', { ascending: false });
+        
         if (vulnError) throw vulnError;
+        setVulnerabilities(vulnData || []);
         
-        // Process vulnerability data and fetch attachments
-        const vulnsWithAttachments = await Promise.all((vulnData || []).map(async (vuln) => {
-          // Fetch attachments for this vulnerability
-          const { data: attachments, error: attachError } = await supabase
-            .from('attachments')
-            .select('*')
-            .eq('vulnerability_id', vuln.id);
-            
-          if (attachError) {
-            console.error(`Error fetching attachments for vulnerability ${vuln.id}:`, attachError);
-            return vuln; // Return vuln without attachments if there was an error
-          }
-          
-          // Add any attachments as POC images if they don't already exist
-          if (attachments && attachments.length > 0) {
-            // Initialize poc_images if it doesn't exist or is null
-            const pocImages = Array.isArray(vuln.poc_images) ? [...vuln.poc_images] : [];
-            
-            // Process attachments and add them to poc_images
-            attachments.forEach(attachment => {
-              // Check if this attachment is already in poc_images by name or content
-              const exists = pocImages.some(img => 
-                img.name === attachment.name || img.data === attachment.data
-              );
-              
-              if (!exists) {
-                pocImages.push({
-                  name: attachment.name,
-                  data: attachment.data,
-                  content_type: attachment.content_type,
-                  label: attachment.label || attachment.name
-                });
-              }
-            });
-            
-            // Update the vulnerability with the combined POC images
-            return { ...vuln, poc_images: pocImages };
-          }
-          
-          return vuln;
-        }));
-        
-        console.log('Processed vulnerabilities data with attachments:', vulnsWithAttachments);
-        
-        // Set the vulnerabilities with attachments
-        setVulnerabilities(vulnsWithAttachments || []);
-
-        // Generate report content
-        if (projectData && vulnsWithAttachments) {
-          const generator = new ReportGenerator(projectData, vulnsWithAttachments);
-          const html = await generator.generateHtml();
-          const markdown = await generator.generateMarkdown();
-          setHtmlContent(html);
-          setMarkdownContent(markdown);
+        // Check if we need to auto-download
+        const downloadFormat = searchParams.get('download');
+        if (downloadFormat) {
+          setTimeout(() => {
+            handleDownload(downloadFormat as 'html' | 'markdown' | 'pdf' | 'word' | 'zip');
+          }, 1000);
         }
-
       } catch (error: any) {
-        console.error('Error loading report data:', error);
         toast({
-          title: 'Error loading report data',
-          description: error.message || 'Failed to load report data',
+          title: 'Error',
+          description: error.message || 'Failed to load project data',
           variant: 'destructive',
         });
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
     fetchProjectData();
-  }, [projectId, toast]);
+  }, [projectId, searchParams, toast]);
 
-  const handleDownload = (format: 'html' | 'markdown' | 'pdf') => {
-    if (!projectData) return;
+  const handleDownload = async (format: 'html' | 'markdown' | 'pdf' | 'word' | 'zip') => {
+    if (!project) return;
     
-    const fileName = `${projectData.title.replace(/\s+/g, '_')}_Report`;
-    let content: string = '';
-    let mimeType: string = '';
-    let fileExtension: string = '';
-
-    switch (format) {
-      case 'html':
-        content = htmlContent;
-        mimeType = 'text/html';
-        fileExtension = 'html';
-        break;
-      case 'markdown':
-        content = markdownContent;
-        mimeType = 'text/markdown';
-        fileExtension = 'md';
-        break;
-      case 'pdf':
-        // PDF generation would require a library like jsPDF or sending to a server
+    try {
+      setIsExporting(true);
+      
+      if (format === 'zip') {
+        try {
+          // Export the project as a zip file
+          const zipBlob = await exportProjectToZip(projectId!);
+          
+          // Create a download link
+          const url = URL.createObjectURL(zipBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${project.title.replace(/\s+/g, '_')}_export.zip`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          toast({
+            title: 'Export Successful',
+            description: 'Project has been exported successfully'
+          });
+        } catch (error: any) {
+          console.error('Export error:', error);
+          toast({
+            title: 'Export Failed',
+            description: error.message || 'Failed to export project',
+            variant: 'destructive',
+          });
+        }
+      } else if (format === 'pdf') {
+        await handleExportToPdf();
+      } else if (format === 'word') {
+        await handleExportToWord();
+      } else if (format === 'html') {
+        // Export as HTML
+        const reportElement = document.getElementById('report-container');
+        if (!reportElement) return;
+        
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>${project.title}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h1, h2, h3 { margin-top: 20px; }
+              table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              img { max-width: 100%; height: auto; }
+            </style>
+          </head>
+          <body>
+            ${reportElement.innerHTML}
+          </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.title.replace(/\s+/g, '_')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
         toast({
-          title: 'PDF Generation',
-          description: 'PDF download is not yet implemented',
-          variant: 'default',
+          title: 'Success',
+          description: 'HTML exported successfully'
         });
-        return;
+      } else if (format === 'markdown') {
+        // Export as Markdown (simplified)
+        const reportElement = document.getElementById('report-container');
+        if (!reportElement) return;
+        
+        // Very basic HTML to Markdown conversion
+        let html = reportElement.innerHTML;
+        let markdown = html
+          .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
+          .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
+          .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+          .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+          .replace(/<\/ul>/gi, '\n')
+          .replace(/<\/ol>/gi, '\n')
+          .replace(/<[^>]*>/g, '');
+        
+        const blob = new Blob([markdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.title.replace(/\s+/g, '_')}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: 'Success',
+          description: 'Markdown exported successfully'
+        });
+      }
+    } finally {
+      setIsExporting(false);
     }
-
-    // Create a blob and download it
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileName}.${fileExtension}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: 'Report Downloaded',
-      description: `Your report has been downloaded as ${fileExtension.toUpperCase()}`,
-      variant: 'default',
-    });
   };
 
-  if (loading) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="flex flex-col items-center gap-4">
-            <Spinner />
-            <p className="text-muted-foreground">Loading report data...</p>
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
+  // Fix PDF generation to prevent empty pages and include images properly
+  const handleExportToPdf = async () => {
+    const reportElement = document.getElementById('report-container');
+    if (!reportElement) return;
+
+    try {
+      setIsExporting(true);
+      toast({
+        title: 'Exporting PDF',
+        description: 'Please wait while we generate your PDF...'
+      });
+      
+      // Apply print-specific styles
+      document.body.classList.add('print-pdf');
+      
+      // Use html2pdf with better options to fix empty pages
+      const opt = {
+        margin: 10,
+        filename: `${project?.title || 'report'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          scrollY: 0,
+          letterRendering: true,
+          logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
+      };
+      
+      await html2pdf().set(opt).from(reportElement).save();
+      
+      toast({
+        title: 'Success',
+        description: 'PDF exported successfully'
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export PDF. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      // Remove print-specific styles
+      document.body.classList.remove('print-pdf');
+      setIsExporting(false);
+    }
+  };
+
+  // Fix Word document generation to work in browser environments
+  const handleExportToWord = async () => {
+    if (!project) return;
+    
+    try {
+      setIsExporting(true);
+      toast({
+        title: 'Exporting Word Document',
+        description: 'Please wait while we generate your document...'
+      });
+      
+      // Get the HTML content
+      const reportElement = document.getElementById('report-container');
+      if (!reportElement) return;
+      
+      let htmlContent = reportElement.innerHTML;
+      
+      // Convert all images to base64 to ensure they're included in the Word doc
+      const images = reportElement.querySelectorAll('img');
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const imgSrc = img.getAttribute('src');
+        
+        if (imgSrc && !imgSrc.startsWith('data:')) {
+          try {
+            const response = await fetch(imgSrc);
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            
+            // Replace the image source with base64 data
+            htmlContent = htmlContent.replace(imgSrc, base64);
+          } catch (e) {
+            console.error('Failed to convert image to base64:', e);
+          }
+        }
+      }
+      
+      // Use our updated htmlToWord function which returns a Blob directly
+      const blob = await htmlToWord(htmlContent, {
+        pageTitle: project.title
+      });
+      
+      // Create a download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.title.replace(/\s+/g, '_')}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Success',
+        description: 'Word document exported successfully'
+      });
+    } catch (error) {
+      console.error('Word export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export Word document. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
 
   if (!projectData) {
     return (
@@ -208,60 +337,10 @@ const ReportView = () => {
         <DownloadDropdown onDownload={handleDownload} />
       </div>
 
-      <h1 className="text-3xl font-bold mb-6">Security Assessment Report</h1>
-
-      <Tabs defaultValue="preview" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="preview" onClick={() => setActiveTab('preview')}>Preview</TabsTrigger>
-          <TabsTrigger value="html" onClick={() => setActiveTab('html')}>HTML</TabsTrigger>
-          <TabsTrigger value="markdown" onClick={() => setActiveTab('markdown')}>Markdown</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="preview" className="mt-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Report Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md overflow-hidden">
-                <div className="bg-white p-8">
-                  <ReportPreview project={projectData} vulnerabilities={vulnerabilities} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="html">
-          <Card>
-            <CardHeader>
-              <CardTitle>HTML Source</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md overflow-hidden">
-                <pre className="bg-muted p-4 overflow-x-auto text-sm">
-                  {htmlContent}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="markdown">
-          <Card>
-            <CardHeader>
-              <CardTitle>Markdown Source</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md overflow-hidden">
-                <pre className="bg-muted p-4 overflow-x-auto text-sm">
-                  {markdownContent}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <h1 className="text-3xl font-bold">Security Assessment Report</h1>
+      <div id="report-container" className="space-y-8 pb-20">
+        <ReportPreview project={projectData} vulnerabilities={vulnerabilities} />
+      </div>
     </MainLayout>
   );
 };

@@ -13,16 +13,16 @@
 
 @layer base {
   :root {
-    --background: 60 100% 98%;
+    --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
 
-    --card: 60 100% 98%;
+    --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
 
-    --popover: 60 100% 98%;
+    --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
 
-    --primary: 60 100% 98%;
+    --primary: 0 0% 100%;
     --primary-foreground: 240 5.9% 10%;
 
     --secondary: 94 44% 63%;
@@ -43,7 +43,7 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 60 100% 98%;
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 94 44% 63%;
     --sidebar-primary-foreground: 240 5.9% 10%;
@@ -51,6 +51,13 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Severity colors */
+    --severity-critical: 0 84.2% 60.2%;
+    --severity-high: 32 84% 49%;
+    --severity-medium: 84 63% 40%;
+    --severity-low: 205 100% 63%;
+    --severity-info: 210 9% 57%;
   }
 
   .dark {
@@ -90,6 +97,13 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Severity colors remain the same in dark mode */
+    --severity-critical: 0 84.2% 60.2%;
+    --severity-high: 32 84% 49%;
+    --severity-medium: 84 63% 40%;
+    --severity-low: 205 100% 63%;
+    --severity-info: 210 9% 57%;
   }
 }
 

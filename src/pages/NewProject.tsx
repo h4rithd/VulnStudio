@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
-import { Button } from '@/components/ui/button';
 import ProjectWizard from '@/components/project/ProjectWizard';
 
 const NewProject = () => {

@@ -1,26 +1,27 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Plus, 
-  FileText, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  CheckCircle2, 
-  Download, 
-  Copy, 
+import { exportProjectToZip } from '@/utils/projectExport';
+import {
+  Plus,
+  FileText,
+  Edit,
+  Trash2,
+  Eye,
+  CheckCircle2,
+  Download,
+  Copy,
   RefreshCcw,
-  Search
+  Search,
+  Archive
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { Reports, Vulnerabilities } from '@/types/database.types';
+import { Reports } from '@/types/database.types';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -40,6 +41,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import ProjectImportButton from '@/components/project/ProjectImportButton';
 
 interface ProjectWithVulnerabilities extends Reports {
   vulnerabilities_count?: {
@@ -86,12 +88,12 @@ const Projects = () => {
           .from('vulnerabilities')
           .select('severity')
           .eq('report_id', project.id);
-        
+
         if (vulnError) {
           console.error("Error fetching vulnerabilities:", vulnError);
           return project;
         }
-        
+
         const vulnCounts = {
           total: vulnData?.length || 0,
           critical: vulnData?.filter(v => v.severity === 'critical').length || 0,
@@ -103,7 +105,7 @@ const Projects = () => {
 
         // Check if this is a retest project
         const isRetest = project.title.startsWith('Re-test:');
-        
+
         return {
           ...project,
           vulnerabilities_count: vulnCounts,
@@ -168,16 +170,16 @@ const Projects = () => {
         .from('reports')
         .update({ status: 'completed' })
         .eq('id', projectId);
-        
+
       if (error) throw error;
-      
+
       // Update the local projects list
-      setProjects(projects.map(project => 
-        project.id === projectId 
-          ? { ...project, status: 'completed' } 
+      setProjects(projects.map(project =>
+        project.id === projectId
+          ? { ...project, status: 'completed' }
           : project
       ));
-      
+
       toast({
         title: 'Success',
         description: 'Project marked as completed',
@@ -193,13 +195,13 @@ const Projects = () => {
 
   const handleDuplicateProject = async (type: 'duplicate' | 'retest') => {
     if (!projectToDuplicate) return;
-    
+
     try {
       // Create a new project record based on the original
-      const newTitle = type === 'retest' 
+      const newTitle = type === 'retest'
         ? `Re-test: ${projectToDuplicate.title}`
         : `Copy of ${projectToDuplicate.title}`;
-        
+
       const { data: newProject, error: projectError } = await supabase
         .from('reports')
         .insert({
@@ -215,17 +217,17 @@ const Projects = () => {
         })
         .select()
         .single();
-        
+
       if (projectError) throw projectError;
-      
+
       // Fetch vulnerabilities from the original project
       const { data: originalVulns, error: vulnFetchError } = await supabase
         .from('vulnerabilities')
         .select('*')
         .eq('report_id', projectToDuplicate.id);
-        
+
       if (vulnFetchError) throw vulnFetchError;
-      
+
       // If there are vulnerabilities, duplicate them for the new project
       if (originalVulns && originalVulns.length > 0 && newProject) {
         // Create a new array with spread operators instead of directly modifying the objects
@@ -239,17 +241,17 @@ const Projects = () => {
             updated_at: new Date().toISOString()
           };
         });
-        
+
         const { error: vulnInsertError } = await supabase
           .from('vulnerabilities')
           .insert(newVulnerabilities);
-          
+
         if (vulnInsertError) throw vulnInsertError;
       }
-      
+
       // Refresh projects list
       await fetchProjects();
-      
+
       toast({
         title: 'Success',
         description: type === 'retest'
@@ -273,15 +275,44 @@ const Projects = () => {
     window.open(`/projects/${projectId}/report?download=${format}`, '_blank');
   };
 
+  const handleExportProject = async (projectId: string, title: string) => {
+    try {
+      // Export the project as a zip file
+      const zipBlob = await exportProjectToZip(projectId!);
+
+      // Create a download link
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      // link.download = `abc_export.zip`;
+      link.download = `${title.replace(/\s+/g, '_')}_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Successful',
+        description: 'Project has been exported successfully'
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: error.message || 'Failed to export project',
+        variant: 'destructive',
+      });
+    }
+  }
   // Filter projects based on search query
-  const filteredProjects = projects.filter(project => 
+  const filteredProjects = projects.filter(project =>
     project.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   // Render vulnerability counts with colored badges
   const renderVulnerabilityCounts = (project: ProjectWithVulnerabilities) => {
     if (!project.vulnerabilities_count) return null;
-    
+
     const counts = project.vulnerabilities_count;
     return (
       <div className="flex items-center gap-1">
@@ -316,14 +347,14 @@ const Projects = () => {
       </div>
     );
   };
-  
+
   const renderProjects = (filteredProjects: ProjectWithVulnerabilities[]) => {
     if (loading) {
       return (
         <div className="py-8 text-center text-muted-foreground">Loading projects...</div>
       );
     }
-    
+
     if (filteredProjects.length === 0) {
       return (
         <div className="p-8 text-center">
@@ -417,13 +448,22 @@ const Projects = () => {
                           <span>View Report</span>
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => handleDownload(project.id, 'html')}
+                      <DropdownMenuItem
+                        onClick={() => handleExportProject(project.id, project.title)}
+                        className="cursor-pointer flex items-center"
+                      >
+                        <Archive className="mr-2 h-4 w-4" />
+                        <span>Export Report</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDownload(project.id, 'pdf')}
                         className="cursor-pointer flex items-center"
                       >
                         <Download className="mr-2 h-4 w-4" />
                         <span>Download Report</span>
                       </DropdownMenuItem>
+                      
+
                       {isAdmin && (
                         <>
                           <DropdownMenuSeparator />
@@ -433,7 +473,7 @@ const Projects = () => {
                               <span>Edit Project</span>
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => {
                               setProjectToDuplicate(project);
                               setDuplicateType('duplicate');
@@ -444,7 +484,7 @@ const Projects = () => {
                             <Copy className="mr-2 h-4 w-4" />
                             <span>Duplicate</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => {
                               setProjectToDuplicate(project);
                               setDuplicateType('retest');
@@ -457,7 +497,7 @@ const Projects = () => {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {project.status !== 'completed' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => markProjectAsCompleted(project.id)}
                               className="cursor-pointer flex items-center"
                             >
@@ -465,7 +505,7 @@ const Projects = () => {
                               <span>Mark Completed</span>
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => setProjectToDelete(project.id)}
                             className="cursor-pointer flex items-center text-destructive focus:text-destructive"
                           >
@@ -493,22 +533,25 @@ const Projects = () => {
           <p className="text-muted-foreground">Manage your security testing projects</p>
         </div>
         {isAdmin && (
-          <Button asChild>
-            <Link to="/projects/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <ProjectImportButton />
+            <Button asChild>
+              <Link to="/projects/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
       <div className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Search projects..." 
-            className="pl-10" 
-            value={searchQuery} 
+          <Input
+            placeholder="Search projects..."
+            className="pl-10"
+            value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
@@ -524,15 +567,15 @@ const Projects = () => {
         <TabsContent value="all" className="space-y-4">
           {renderProjects(filteredProjects)}
         </TabsContent>
-        
+
         <TabsContent value="draft" className="space-y-4">
           {renderProjects(filteredProjects.filter(p => p.status === 'draft'))}
         </TabsContent>
-        
+
         <TabsContent value="completed" className="space-y-4">
           {renderProjects(filteredProjects.filter(p => p.status === 'completed'))}
         </TabsContent>
-        
+
         <TabsContent value="retest" className="space-y-4">
           {renderProjects(filteredProjects.filter(p => p.is_retest))}
         </TabsContent>
@@ -549,8 +592,8 @@ const Projects = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => projectToDelete && handleDeleteProject(projectToDelete)} 
+            <AlertDialogAction
+              onClick={() => projectToDelete && handleDeleteProject(projectToDelete)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
@@ -567,14 +610,14 @@ const Projects = () => {
               {duplicateType === 'retest' ? 'Create Re-test Project' : 'Duplicate Project'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {duplicateType === 'retest' 
+              {duplicateType === 'retest'
                 ? 'This will create a new project for re-testing with all the same vulnerabilities.'
                 : 'This will create an exact copy of the project and all its vulnerabilities.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => handleDuplicateProject(duplicateType)}
             >
               {duplicateType === 'retest' ? 'Create Re-test' : 'Duplicate'}
