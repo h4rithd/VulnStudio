@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
@@ -15,7 +16,8 @@ import {
   Copy,
   RefreshCcw,
   Search,
-  Archive
+  Archive,
+  AlertTriangle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
@@ -41,6 +43,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import ProjectImportButton from '@/components/project/ProjectImportButton';
 
 interface ProjectWithVulnerabilities extends Reports {
@@ -53,10 +56,41 @@ interface ProjectWithVulnerabilities extends Reports {
     info: number;
   };
   is_retest?: boolean;
+  isTemporary?: boolean;
+}
+
+interface TempProject {
+  id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  preparer: string;
+  preparer_email: string;
+  reviewer: string;
+  reviewer_email: string;
+  version: string;
+  version_history: string;
+  scope: Array<{ value: string }>;
+  status: string;
+  created_at: string;
+}
+
+interface TempVulnerability {
+  id: string;
+  report_id: string;
+  title: string;
+  severity: string;
+  cvss_score: number;
+  cvss_vector: string;
+  background: string;
+  details: string;
+  remediation: string;
+  created_at: string;
 }
 
 const Projects = () => {
   const [projects, setProjects] = useState<ProjectWithVulnerabilities[]>([]);
+  const [tempProjects, setTempProjects] = useState<ProjectWithVulnerabilities[]>([]);
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAuth();
   const { toast } = useToast();
@@ -65,9 +99,11 @@ const Projects = () => {
   const [duplicateType, setDuplicateType] = useState<'duplicate' | 'retest'>('duplicate');
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
     fetchProjects();
+    loadTemporaryProjects();
   }, []);
 
   const fetchProjects = async () => {
@@ -125,30 +161,96 @@ const Projects = () => {
     }
   };
 
+  const loadTemporaryProjects = () => {
+    try {
+      // Load temporary projects from localStorage
+      const tempProjectsJSON = localStorage.getItem('tempProjects');
+      if (tempProjectsJSON) {
+        const loadedProjects = JSON.parse(tempProjectsJSON) as TempProject[];
+        
+        // Get vulnerabilities for each project
+        const tempProjectsWithVulns = loadedProjects.map(project => {
+          // Get vulnerabilities for this project from localStorage
+          const vulnKey = `tempVulnerabilities_${project.id}`;
+          const vulnJSON = localStorage.getItem(vulnKey);
+          const vulnerabilities = vulnJSON ? JSON.parse(vulnJSON) as TempVulnerability[] : [];
+          
+          // Create vulnerability counts
+          const vulnCounts = {
+            total: vulnerabilities.length,
+            critical: vulnerabilities.filter(v => v.severity === 'critical').length,
+            high: vulnerabilities.filter(v => v.severity === 'high').length,
+            medium: vulnerabilities.filter(v => v.severity === 'medium').length,
+            low: vulnerabilities.filter(v => v.severity === 'low').length,
+            info: vulnerabilities.filter(v => v.severity === 'info').length,
+          };
+          
+          // Check if this is a retest project
+          const isRetest = project.title.startsWith('Re-test:');
+          
+          return {
+            ...project,
+            vulnerabilities_count: vulnCounts,
+            is_retest: isRetest,
+            isTemporary: true
+          };
+        });
+        
+        setTempProjects(tempProjectsWithVulns);
+      }
+    } catch (error: any) {
+      console.error('Error loading temporary projects:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load temporary projects',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleDeleteProject = async (id: string) => {
     try {
-      // First, delete all vulnerabilities related to this report
-      const { error: vulnError } = await supabase
-        .from('vulnerabilities')
-        .delete()
-        .eq('report_id', id);
+      // Check if it's a temporary project
+      if (id.startsWith('temp_')) {
+        // Delete from localStorage
+        const tempProjectsJSON = localStorage.getItem('tempProjects');
+        if (tempProjectsJSON) {
+          const tempProjects = JSON.parse(tempProjectsJSON);
+          const updatedProjects = tempProjects.filter((p: any) => p.id !== id);
+          localStorage.setItem('tempProjects', JSON.stringify(updatedProjects));
+          
+          // Delete vulnerabilities
+          localStorage.removeItem(`tempVulnerabilities_${id}`);
+          
+          // Update state
+          setTempProjects(prev => prev.filter(p => p.id !== id));
+        }
+      } else {
+        // Delete from supabase
+        // First, delete all vulnerabilities related to this report
+        const { error: vulnError } = await supabase
+          .from('vulnerabilities')
+          .delete()
+          .eq('report_id', id);
 
-      if (vulnError) {
-        throw vulnError;
+        if (vulnError) {
+          throw vulnError;
+        }
+
+        // Then delete the report itself
+        const { error } = await supabase
+          .from('reports')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          throw error;
+        }
+
+        // Update the UI
+        setProjects(projects.filter(project => project.id !== id));
       }
-
-      // Then delete the report itself
-      const { error } = await supabase
-        .from('reports')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
-      }
-
-      // Update the UI
-      setProjects(projects.filter(project => project.id !== id));
+      
       toast({
         title: 'Success',
         description: 'Project and its vulnerabilities deleted successfully',
@@ -166,19 +268,41 @@ const Projects = () => {
 
   const markProjectAsCompleted = async (projectId: string) => {
     try {
-      const { error } = await supabase
-        .from('reports')
-        .update({ status: 'completed' })
-        .eq('id', projectId);
+      if (projectId.startsWith('temp_')) {
+        // Update temporary project status
+        const tempProjectsJSON = localStorage.getItem('tempProjects');
+        if (tempProjectsJSON) {
+          const tempProjects = JSON.parse(tempProjectsJSON);
+          const updatedProjects = tempProjects.map((p: any) => {
+            if (p.id === projectId) {
+              return { ...p, status: 'completed' };
+            }
+            return p;
+          });
+          
+          localStorage.setItem('tempProjects', JSON.stringify(updatedProjects));
+          
+          // Update state
+          setTempProjects(prev => prev.map(p => 
+            p.id === projectId ? { ...p, status: 'completed' } : p
+          ));
+        }
+      } else {
+        // Update cloud project status
+        const { error } = await supabase
+          .from('reports')
+          .update({ status: 'completed' })
+          .eq('id', projectId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Update the local projects list
-      setProjects(projects.map(project =>
-        project.id === projectId
-          ? { ...project, status: 'completed' }
-          : project
-      ));
+        // Update the local projects list
+        setProjects(projects.map(project =>
+          project.id === projectId
+            ? { ...project, status: 'completed' }
+            : project
+        ));
+      }
 
       toast({
         title: 'Success',
@@ -199,58 +323,107 @@ const Projects = () => {
     try {
       // Create a new project record based on the original
       const newTitle = type === 'retest'
-        ? `Re-test: ${projectToDuplicate.title}`
+        ? `Re-test: ${projectToDuplicate.title.replace(/^Re-test:\s*/g, '')}`
         : `Copy of ${projectToDuplicate.title}`;
 
-      const { data: newProject, error: projectError } = await supabase
-        .from('reports')
-        .insert({
-          title: newTitle,
-          start_date: projectToDuplicate.start_date,
-          end_date: projectToDuplicate.end_date,
-          preparer: projectToDuplicate.preparer,
-          reviewer: projectToDuplicate.reviewer,
-          scope: projectToDuplicate.scope,
-          version: projectToDuplicate.version,
-          status: 'draft',
-          created_by: projectToDuplicate.created_by
-        })
-        .select()
-        .single();
-
-      if (projectError) throw projectError;
-
-      // Fetch vulnerabilities from the original project
-      const { data: originalVulns, error: vulnFetchError } = await supabase
-        .from('vulnerabilities')
-        .select('*')
-        .eq('report_id', projectToDuplicate.id);
-
-      if (vulnFetchError) throw vulnFetchError;
-
-      // If there are vulnerabilities, duplicate them for the new project
-      if (originalVulns && originalVulns.length > 0 && newProject) {
-        // Create a new array with spread operators instead of directly modifying the objects
-        const newVulnerabilities = originalVulns.map(vuln => {
-          // Create a new object without the id field
-          const { id, ...vulnWithoutId } = vuln;
-          return {
-            ...vulnWithoutId,
-            report_id: newProject.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+      if (projectToDuplicate.isTemporary) {
+        // Duplicate temporary project
+        const tempProjectsJSON = localStorage.getItem('tempProjects');
+        if (tempProjectsJSON) {
+          const tempProjects = JSON.parse(tempProjectsJSON);
+          
+          // Create new project
+          const newProject = {
+            ...projectToDuplicate,
+            id: `temp_${Math.random().toString(36).substr(2, 16)}`,
+            title: newTitle,
+            status: 'draft',
+            created_at: new Date().toISOString()
           };
-        });
+          
+          // Add to localStorage
+          tempProjects.push(newProject);
+          localStorage.setItem('tempProjects', JSON.stringify(tempProjects));
+          
+          // Copy vulnerabilities
+          const vulnKey = `tempVulnerabilities_${projectToDuplicate.id}`;
+          const vulnJSON = localStorage.getItem(vulnKey);
+          
+          if (vulnJSON) {
+            const vulnerabilities = JSON.parse(vulnJSON);
+            
+            if (vulnerabilities.length > 0) {
+              // Create new vulnerabilities
+              const newVulnerabilities = vulnerabilities.map((vuln: any) => ({
+                ...vuln,
+                id: `temp_vuln_${Math.random().toString(36).substr(2, 16)}`,
+                report_id: newProject.id,
+                created_at: new Date().toISOString()
+              }));
+              
+              // Save to localStorage
+              localStorage.setItem(
+                `tempVulnerabilities_${newProject.id}`, 
+                JSON.stringify(newVulnerabilities)
+              );
+            }
+          }
+          
+          // Refresh temporary projects list
+          loadTemporaryProjects();
+        }
+      } else {
+        // Duplicate cloud project
+        const { data: newProject, error: projectError } = await supabase
+          .from('reports')
+          .insert({
+            title: newTitle,
+            start_date: projectToDuplicate.start_date,
+            end_date: projectToDuplicate.end_date,
+            preparer: projectToDuplicate.preparer,
+            reviewer: projectToDuplicate.reviewer,
+            scope: projectToDuplicate.scope,
+            version: projectToDuplicate.version,
+            status: 'draft',
+            created_by: projectToDuplicate.created_by
+          })
+          .select()
+          .single();
 
-        const { error: vulnInsertError } = await supabase
+        if (projectError) throw projectError;
+
+        // Fetch vulnerabilities from the original project
+        const { data: originalVulns, error: vulnFetchError } = await supabase
           .from('vulnerabilities')
-          .insert(newVulnerabilities);
+          .select('*')
+          .eq('report_id', projectToDuplicate.id);
 
-        if (vulnInsertError) throw vulnInsertError;
+        if (vulnFetchError) throw vulnFetchError;
+
+        // If there are vulnerabilities, duplicate them for the new project
+        if (originalVulns && originalVulns.length > 0 && newProject) {
+          // Create a new array with spread operators instead of directly modifying the objects
+          const newVulnerabilities = originalVulns.map(vuln => {
+            // Create a new object without the id field
+            const { id, ...vulnWithoutId } = vuln;
+            return {
+              ...vulnWithoutId,
+              report_id: newProject.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+          });
+
+          const { error: vulnInsertError } = await supabase
+            .from('vulnerabilities')
+            .insert(newVulnerabilities);
+
+          if (vulnInsertError) throw vulnInsertError;
+        }
+        
+        // Refresh projects list
+        await fetchProjects();
       }
-
-      // Refresh projects list
-      await fetchProjects();
 
       toast({
         title: 'Success',
@@ -278,13 +451,12 @@ const Projects = () => {
   const handleExportProject = async (projectId: string, title: string) => {
     try {
       // Export the project as a zip file
-      const zipBlob = await exportProjectToZip(projectId!);
+      const zipBlob = await exportProjectToZip(projectId);
 
       // Create a download link
       const url = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
       link.href = url;
-      // link.download = `abc_export.zip`;
       link.download = `${title.replace(/\s+/g, '_')}_export.zip`;
       document.body.appendChild(link);
       link.click();
@@ -303,9 +475,13 @@ const Projects = () => {
         variant: 'destructive',
       });
     }
-  }
+  };
+
+  // Get all projects (regular + temporary)
+  const allProjects = [...projects, ...tempProjects];
+  
   // Filter projects based on search query
-  const filteredProjects = projects.filter(project =>
+  const filteredProjects = allProjects.filter(project =>
     project.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -315,7 +491,7 @@ const Projects = () => {
 
     const counts = project.vulnerabilities_count;
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         {counts.critical > 0 && (
           <Badge className="bg-severity-critical text-white hover:bg-severity-critical/50">
             {counts.critical} Critical
@@ -399,6 +575,11 @@ const Projects = () => {
                         Initial Assessment
                       </Badge>
                     )}
+                    {project.isTemporary && (
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-none">
+                        Temporary
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -455,15 +636,16 @@ const Projects = () => {
                         <Archive className="mr-2 h-4 w-4" />
                         <span>Export Report</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDownload(project.id, 'pdf')}
-                        className="cursor-pointer flex items-center"
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        <span>Download Report</span>
-                      </DropdownMenuItem>
+                      {!project.isTemporary && (
+                        <DropdownMenuItem
+                          onClick={() => handleDownload(project.id, 'pdf')}
+                          className="cursor-pointer flex items-center"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          <span>Download Report</span>
+                        </DropdownMenuItem>
+                      )}
                       
-
                       {isAdmin && (
                         <>
                           <DropdownMenuSeparator />
@@ -545,6 +727,17 @@ const Projects = () => {
         )}
       </div>
 
+      {tempProjects.length > 0 && (
+        <Alert className="mb-6 bg-amber-50 border-amber-200 text-amber-800">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Temporary Projects Warning</AlertTitle>
+          <AlertDescription>
+            Temporary projects are stored only in your browser. They may be deleted if you clear your browser 
+            data or log out. Remember to export your projects to save your work.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -557,15 +750,20 @@ const Projects = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="all" className="space-y-4">
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="temp">Temporary</TabsTrigger>
           <TabsTrigger value="draft">Draft</TabsTrigger>
           <TabsTrigger value="completed">Complete</TabsTrigger>
           <TabsTrigger value="retest">Retests</TabsTrigger>
         </TabsList>
         <TabsContent value="all" className="space-y-4">
           {renderProjects(filteredProjects)}
+        </TabsContent>
+
+        <TabsContent value="temp" className="space-y-4">
+          {renderProjects(filteredProjects.filter(p => p.isTemporary))}
         </TabsContent>
 
         <TabsContent value="draft" className="space-y-4">

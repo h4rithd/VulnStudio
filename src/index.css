@@ -14,32 +14,32 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-
+    --card-foreground: 222.2 84% 4.9%;
+ 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 222.2 84% 4.9%;
+ 
+    --primary: 90 45% 63%;  /* #9cca77 */
+    --primary-foreground: 210 40% 98%;
 
-    --primary: 0 0% 100%;
-    --primary-foreground: 240 5.9% 10%;
-
-    --secondary: 94 44% 63%;
-    --secondary-foreground: 240 5.9% 10%;
-
-    --muted: 60 50% 96.1%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+ 
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
     --accent: 94 44% 63%;
     --accent-foreground: 240 5.9% 10%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 90 45% 63%;  /* #9cca77 */
 
     --radius: 0.5rem;
 
@@ -51,13 +51,6 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* Severity colors */
-    --severity-critical: 0 84.2% 60.2%;
-    --severity-high: 32 84% 49%;
-    --severity-medium: 84 63% 40%;
-    --severity-low: 205 100% 63%;
-    --severity-info: 210 9% 57%;
   }
 
   .dark {
@@ -97,13 +90,6 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* Severity colors remain the same in dark mode */
-    --severity-critical: 0 84.2% 60.2%;
-    --severity-high: 32 84% 49%;
-    --severity-medium: 84 63% 40%;
-    --severity-low: 205 100% 63%;
-    --severity-info: 210 9% 57%;
   }
 }
 

@@ -1,722 +1,590 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth } from '@/context/AuthContext';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+import { useAuth } from '@/context/AuthContext';
+import { DynamicInputList, Item } from '@/components/ui/dynamic-input-list';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, ArrowRight, Check, Calendar, AlertTriangle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// Form schemas for each step
-const projectTypeSchema = z.object({
-  storageType: z.enum(['permanent', 'temporary'])
+// Define the form schema
+const formSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  start_date: z.date({ required_error: 'Start date is required' }),
+  end_date: z.date({ required_error: 'End date is required' }),
+  preparer: z.string().min(1, 'Preparer name is required'),
+  preparer_email: z.string().email('Invalid email').optional().or(z.literal('')),
+  reviewer: z.string().min(1, 'Reviewer name is required'),
+  reviewer_email: z.string().email('Invalid email').optional().or(z.literal('')),
+  scope: z.array(z.object({ value: z.string() })).optional(),
+  version: z.string().optional(),
+  isTemporary: z.boolean().optional(),
+  projectType: z.enum(['permanent', 'temporary']).default('permanent'),
 });
 
-const projectInfoSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  assessment_type: z.enum(['initial', 'retest']).default('initial'),
-  start_date: z.date(),
-  end_date: z.date(),
-  preparer: z.string().min(3, 'Preparer name is required'),
-  preparer_email: z.string().email('Valid email is required'),
-  reviewer: z.string().min(3, 'Reviewer name is required'),
-  reviewer_email: z.string().email('Valid email is required'),
-});
+type FormValues = z.infer<typeof formSchema>;
 
-const scopeItemSchema = z.object({
-  type: z.string().min(1, 'Type is required'),
-  value: z.string().min(1, 'Value is required'),
-});
-
-const projectScopeSchema = z.object({
-  scope: z.array(scopeItemSchema).min(1, 'At least one scope item is required'),
-  version: z.string().min(1, 'Version is required'),
-  version_history: z.string().optional(),
-});
-
-// Combined schema for the final form data
-const formSchema = projectTypeSchema.merge(projectInfoSchema).merge(projectScopeSchema);
-
-type FormData = z.infer<typeof formSchema>;
+// Helper function to format date to YYYY-MM-DD
+const formatDate = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
 
 interface ProjectWizardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const ProjectWizard: React.FC<ProjectWizardProps> = ({ isOpen, onClose }) => {
-  const [step, setStep] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const { user } = useAuth();
-  const { toast } = useToast();
+export const ProjectWizard = ({ isOpen, onClose }: ProjectWizardProps) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  
-  // Individual forms for each step
-  const typeForm = useForm<z.infer<typeof projectTypeSchema>>({
-    resolver: zodResolver(projectTypeSchema),
-    defaultValues: {
-      storageType: 'permanent'
-    }
-  });
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  const infoForm = useForm<z.infer<typeof projectInfoSchema>>({
-    resolver: zodResolver(projectInfoSchema),
+  // Initialize form with default values
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
-      assessment_type: 'initial',
       start_date: new Date(),
-      end_date: new Date(new Date().setDate(new Date().getDate() + 14)),
+      end_date: new Date(),
       preparer: '',
       preparer_email: '',
       reviewer: '',
       reviewer_email: '',
-    }
-  });
-
-  const scopeForm = useForm<z.infer<typeof projectScopeSchema>>({
-    resolver: zodResolver(projectScopeSchema),
-    defaultValues: {
-      scope: [{ type: 'Domain', value: '' }],
+      scope: [{ value: '' }],
       version: '1.0',
-      version_history: '',
-    }
+      isTemporary: false,
+      projectType: 'permanent',
+    },
   });
 
-  // Handle next step
+  // Watch project type selection
+  const projectType = form.watch('projectType');
+  
+  // Define the steps - now with project type as the first step
+  const steps = [
+    {
+      title: 'Project Type',
+      description: 'Choose whether to create a cloud or temporary project',
+      fields: ['projectType'],
+    },
+    {
+      title: 'Basic Information',
+      description: 'Enter the basic details of your project',
+      fields: ['title', 'start_date', 'end_date'],
+    },
+    {
+      title: 'Team Information',
+      description: 'Enter information about the project team',
+      fields: ['preparer', 'preparer_email', 'reviewer', 'reviewer_email'],
+    },
+    {
+      title: 'Project Scope',
+      description: 'Define the scope of your project',
+      fields: ['scope', 'version'],
+    },
+  ];
+
+  // Function to validate the current step
+  const validateStep = async (step: number): Promise<boolean> => {
+  const currentStepFields = steps[step].fields;
+
+  // Validate all fields in the current step
+  const isValid = await form.trigger(currentStepFields as (keyof FormValues)[]);
+
+  return isValid;
+};
+
+
+  // Function to go to the next step
   const handleNext = async () => {
-    switch (step) {
-      case 0:
-        const typeValid = await typeForm.trigger();
-        if (typeValid) setStep(1);
-        break;
-      case 1:
-        const infoValid = await infoForm.trigger();
-        if (infoValid) setStep(2);
-        break;
-      default:
-        break;
+  const isValid = await validateStep(currentStep);
+  if (isValid && currentStep < steps.length - 1) {
+    setCurrentStep(currentStep + 1);
+  }
+};
+
+
+  // Function to go to the previous step
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
     }
   };
 
-  // Handle back step
-  const handleBack = () => {
-    setStep(Math.max(0, step - 1));
-  };
-
-  // Add scope item
-  const addScopeItem = () => {
-    const scope = scopeForm.getValues('scope');
-    scopeForm.setValue('scope', [...scope, { type: 'Domain', value: '' }]);
-  };
-
-  // Remove scope item
-  const removeScopeItem = (index: number) => {
-    const scope = scopeForm.getValues('scope');
-    if (scope.length > 1) {
-      scopeForm.setValue('scope', scope.filter((_, i) => i !== index));
-    } else {
-      toast({
-        title: 'Error',
-        description: 'At least one scope item is required',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Save to localStorage for temporary projects
-  const saveToLocalStorage = (data: FormData) => {
+  // Add a function to save temporary project to localStorage
+  const saveTempProject = (projectData: any) => {
     try {
-      // Format the data for storage
-      const projectData = {
-        ...data,
-        id: `temp-${Date.now()}`,
+      // Generate unique ID for temporary project
+      const tempId = 'temp_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
+      
+      // Create project object with temp ID
+      const tempProject = {
+        ...projectData,
+        id: tempId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         status: 'draft',
-        start_date: data.start_date.toISOString(),
-        end_date: data.end_date.toISOString(),
-        created_by: user?.id || 'anonymous',
-        preparer_email: data.preparer_email,
-        reviewer_email: data.reviewer_email,
-        vulnerabilities: [] // Initialize with empty vulnerabilities array
+        created_by: user?.id || 'local',
       };
       
-      console.log('Saving temporary project to localStorage:', projectData);
+      // Get existing temp projects
+      const existingTempProjects = localStorage.getItem('tempProjects');
+      const tempProjects = existingTempProjects ? JSON.parse(existingTempProjects) : [];
       
-      // Get existing projects or initialize empty array
-      const existingProjects = JSON.parse(localStorage.getItem('temporaryProjects') || '[]');
-      
-      // Add new project
-      existingProjects.push(projectData);
+      // Add new temp project
+      tempProjects.push(tempProject);
       
       // Save back to localStorage
-      localStorage.setItem('temporaryProjects', JSON.stringify(existingProjects));
+      localStorage.setItem('tempProjects', JSON.stringify(tempProjects));
       
-      // Show success message
-      setSuccess(true);
-      toast({
-        title: 'Success',
-        description: 'Temporary project created successfully',
-      });
+      // Initialize an empty array for vulnerabilities for this project
+      localStorage.setItem(`tempVulnerabilities_${tempId}`, JSON.stringify([]));
       
-      // After 2 seconds, close dialog and navigate to projects
-      setTimeout(() => {
-        onClose();
-        navigate('/projects');
-      }, 2000);
-      
-    } catch (error: any) {
-      console.error('Error saving to localStorage:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save temporary project',
-        variant: 'destructive',
-      });
+      return tempId;
+    } catch (error) {
+      console.error('Failed to save temporary project:', error);
+      throw error;
     }
   };
 
-  // Save to database for permanent projects
-  const saveToDatabase = async (data: FormData) => {
-    if (!user) return;
+  // Function to handle form submission
+  const handleFinish = async () => {
+    // Validate final step
+     const isValid = await validateStep(currentStep);
+  if (!isValid) return;
 
-    setIsSubmitting(true);
+  setLoading(true);
+    
     try {
-      // Format the title based on assessment type
-      const formattedTitle = data.assessment_type === 'retest'
-        ? `Re-test: ${data.title}`
-        : data.title;
+      const formData = form.getValues();
+      
+      // Prepare project data
+      const projectData = {
+        title: formData.title,
+        start_date: formatDate(formData.start_date),
+        end_date: formatDate(formData.end_date),
+        preparer: formData.preparer,
+        preparer_email: formData.preparer_email || '',
+        reviewer: formData.reviewer,
+        reviewer_email: formData.reviewer_email || '',
+        scope: formData.scope || [],
+        version: formData.version || '1.0',
+      };
 
-      // Add the project to Supabase
-      const { data: project, error } = await supabase
+      // If creating a temporary project
+      if (formData.projectType === 'temporary') {
+        const tempId = saveTempProject(projectData);
+        
+        // Show success message
+        toast({
+          title: 'Success',
+          description: 'Temporary project created successfully',
+        });
+        
+        // Navigate to the project details page
+        navigate(`/projects/${tempId}`);
+        return;
+      }
+
+      // Otherwise proceed with regular project creation
+      const { data, error } = await supabase
         .from('reports')
-        .insert({
-          title: formattedTitle,
-          start_date: data.start_date.toISOString(),
-          end_date: data.end_date.toISOString(),
-          preparer: data.preparer,
-          preparer_email: data.preparer_email,
-          reviewer: data.reviewer,
-          reviewer_email: data.reviewer_email,
-          version: data.version,
-          version_history: data.version_history || '',
-          scope: data.scope,
-          status: 'draft',
-          created_by: user.id,
-        })
+        .insert([{
+          ...projectData,
+          created_by: user?.id,
+        }])
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Show success message
-      setSuccess(true);
-      
-      // After 2 seconds, close dialog and navigate to new project
-      setTimeout(() => {
-        onClose();
-        navigate(`/projects/${project.id}`);
-      }, 2000);
-      
+      toast({
+        title: 'Success',
+        description: 'Project created successfully',
+      });
+
+      // Navigate to the project details
+      navigate(`/projects/${data.id}`);
     } catch (error: any) {
+      console.error('Error creating project:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to create project',
         variant: 'destructive',
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  // Handle final submission
-  const handleSubmit = async () => {
-    const scopeValid = await scopeForm.trigger();
-    if (!scopeValid) return;
-    
-    // Combine all form data
-    const combinedData: FormData = {
-      ...typeForm.getValues(),
-      ...infoForm.getValues(),
-      ...scopeForm.getValues(),
-    };
-    
-    console.log('Form submission with data:', combinedData);
-    
-    // Save based on storage type
-    if (combinedData.storageType === 'temporary') {
-      saveToLocalStorage(combinedData);
-    } else {
-      await saveToDatabase(combinedData);
-    }
-  };
-
-  // If success screen is shown
-  if (success) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md">
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">
-              Project Created Successfully
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              {typeForm.getValues().storageType === 'temporary' 
-                ? "Your project has been saved locally. Remember to export when finished."
-                : "Your project has been saved to the database."}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Redirecting...
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {step === 0 && "Project Type"}
-            {step === 1 && "Project Information"}
-            {step === 2 && "Project Scope"}
-          </DialogTitle>
-          <DialogDescription>
-            {step === 0 && "Choose how you want to store this project."}
-            {step === 1 && "Enter the basic information about your project."}
-            {step === 2 && "Define the scope and version information for your project."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="mb-4">
-          <div className="w-full bg-gray-200 h-2 rounded-full">
-            <div 
-              className="bg-secondary h-2 rounded-full transition-all duration-300"
-              style={{ width: `${((step + 1) / 3) * 100}%` }}
+    <div className="max-w-3xl mx-auto">
+      {/* Progress indicator */}
+      <div className="mb-8">
+        <div className="flex justify-between">
+          {steps.map((step, index) => (
+            <div key={index} className="flex flex-col items-center">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  index === currentStep
+                    ? 'bg-primary text-primary-foreground'
+                    : index < currentStep
+                    ? 'bg-primary/80 text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {index < currentStep ? <Check className="h-5 w-5" /> : index + 1}
+              </div>
+              <div className="text-sm mt-2 text-center">{step.title}</div>
+            </div>
+          ))}
+        </div>
+        <div className="relative mt-2">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-muted">
+            <div
+              className="h-1 bg-primary transition-all"
+              style={{ width: `${((currentStep) / (steps.length - 1)) * 100}%` }}
             ></div>
           </div>
-          <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-            <span>Project Type</span>
-            <span>Project Info</span>
-            <span>Project Scope</span>
-          </div>
         </div>
+      </div>
 
-        {/* Step 1: Project Type */}
-        {step === 0 && (
-          <Form {...typeForm}>
-            <form className="space-y-6">
-              <FormField
-                control={typeForm.control}
-                name="storageType"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div 
-                        className={`border p-6 rounded-lg cursor-pointer transition-colors ${
-                          field.value === 'permanent' ? 'border-secondary bg-secondary/10' : 'border-gray-200'
-                        }`}
-                        onClick={() => typeForm.setValue('storageType', 'permanent')}
-                      >
-                        <h3 className="font-medium mb-2">Permanent Project</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Project will be stored in the database and accessible across devices.
-                        </p>
-                      </div>
-                      <div 
-                        className={`border p-6 rounded-lg cursor-pointer transition-colors ${
-                          field.value === 'temporary' ? 'border-secondary bg-secondary/10' : 'border-gray-200'
-                        }`}
-                        onClick={() => typeForm.setValue('storageType', 'temporary')}
-                      >
-                        <h3 className="font-medium mb-2">Temporary Project</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Project will be stored locally in your browser and will be lost when browser data is cleared.
-                        </p>
-                        <div className="flex items-center mt-3 text-amber-600 text-sm">
-                          <AlertTriangle className="h-4 w-4 mr-1" />
-                          <span>Remember to export your project when finished.</span>
-                        </div>
-                      </div>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        )}
-
-        {/* Step 2: Project Information */}
-        {step === 1 && (
-          <Form {...infoForm}>
-            <form className="space-y-6">
-              <FormField
-                control={infoForm.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Web Application Security Assessment" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Enter a descriptive name for your project
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={infoForm.control}
-                name="assessment_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assessment Type</FormLabel>
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                          <FormLabel>Re-test Assessment</FormLabel>
-                          <FormDescription>
-                            Toggle for re-test assessment to verify remediation of previous findings
-                          </FormDescription>
-                        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{steps[currentStep].title}</CardTitle>
+          <CardDescription>{steps[currentStep].description}</CardDescription>
+        </CardHeader>
+        <Form {...form}>
+          <form>
+            <CardContent className="space-y-4">
+              {/* Step 0: Project Type */}
+              {currentStep === 0 && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="projectType"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Choose Project Type</FormLabel>
                         <FormControl>
-                          <Switch
-                            checked={field.value === 'retest'}
-                            onCheckedChange={(checked) => 
-                              infoForm.setValue('assessment_type', checked ? 'retest' : 'initial')
-                            }
-                          />
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex flex-col space-y-1"
+                          >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="permanent" />
+                              </FormControl>
+                              <div className="space-y-1">
+                                <FormLabel className="font-medium">
+                                  Cloud Project
+                                </FormLabel>
+                                <FormDescription>
+                                  Store your project in the cloud for team collaboration and access from anywhere.
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="temporary" />
+                              </FormControl>
+                              <div className="space-y-1">
+                                <FormLabel className="font-medium">
+                                  Temporary Project
+                                </FormLabel>
+                                <FormDescription>
+                                  Store your project locally in your browser. Your data stays on your device.
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                          </RadioGroup>
                         </FormControl>
-                      </div>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={infoForm.control}
-                  name="start_date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
+                  {/* Warning for temporary projects */}
+                  {form.watch('projectType') === 'temporary' && (
+                    <Alert variant="warning" className="bg-amber-50 text-amber-800 border-amber-200 mt-4">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Warning</AlertTitle>
+                      <AlertDescription>
+                        Temporary projects are stored only in your browser. They may be deleted if you clear your browser data or log out. 
+                        Remember to export your project when completed to save your work.
+                      </AlertDescription>
+                    </Alert>
                   )}
-                />
+                </>
+              )}
 
-                <FormField
-                  control={infoForm.control}
-                  name="end_date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>End Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Step 1: Basic Information */}
+              {currentStep === 1 && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter project title" {...field} required/>
+                        </FormControl>
+                        <FormDescription>
+                          The title of your security assessment project
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-6">
-                  <FormField
-                    control={infoForm.control}
-                    name="preparer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Preparer</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Name of the person preparing the report" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={infoForm.control}
-                    name="preparer_email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Preparer Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="Email of the preparer" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="space-y-6">
-                  <FormField
-                    control={infoForm.control}
-                    name="reviewer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reviewer</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Name of the person reviewing the report" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={infoForm.control}
-                    name="reviewer_email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reviewer Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="Email of the reviewer" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-            </form>
-          </Form>
-        )}
-
-        {/* Step 3: Project Scope */}
-        {step === 2 && (
-          <Form {...scopeForm}>
-            <form className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <FormLabel>Project Scope</FormLabel>
-                </div>
-                <div className="space-y-4">
-                  {scopeForm.watch('scope').map((_, index) => (
-                    <div key={index} className="flex items-center gap-6">
-                      <FormField
-                        control={scopeForm.control}
-                        name={`scope.${index}.type`}
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormControl>
-                              <Input
-                                placeholder="Type (e.g., domain, IP, application)"
-                                {...field}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="start_date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Start Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className="w-full pl-3 text-left font-normal"
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                  <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date < new Date("1900-01-01")
+                                }
+                                initialFocus
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={scopeForm.control}
-                        name={`scope.${index}.value`}
-                        render={({ field }) => (
-                          <FormItem className="flex-[2]">
-                            <FormControl>
-                              <Input
-                                placeholder="Define the scope of your security assessment (domains, IPs, applications)"
-                                {...field}
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="end_date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>End Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className="w-full pl-3 text-left font-normal"
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                  <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date < new Date("1900-01-01")
+                                }
+                                initialFocus
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeScopeItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addScopeItem}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
-                </div>
-              </div>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={scopeForm.control}
-                  name="version"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Version</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 1.0" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Current version of the report
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+              {/* Step 2: Team Information */}
+              {currentStep === 2 && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="preparer"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Preparer Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter preparer name" {...field} required />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="preparer_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Preparer Email (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter preparer email" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="reviewer"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reviewer Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter reviewer name" {...field} required/>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="reviewer_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reviewer Email (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter reviewer email" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Step 3: Project Scope */}
+              {currentStep === 3 && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="scope"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Scope</FormLabel>
+                        <FormControl>
+                          <DynamicInputList
+                            items={field.value || [{ value: '' }]}
+                            onChange={(items: Item[]) => field.onChange(items)}
+                            placeholder="Enter scope item"
+                            required
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Define the scope of your security assessment (e.g., URLs, IP ranges, applications)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="version"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Report Version</FormLabel>
+                        <FormControl>
+                          <Input placeholder="1.0" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Version number for this report
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 0}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+              </Button>
+
+              {currentStep < steps.length - 1 ? (
+                <Button type="button" onClick={handleNext}>
+                  Next <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleFinish}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Create Project <Check className="ml-2 h-4 w-4" />
+                    </>
                   )}
-                />
-
-                <FormField
-                  control={scopeForm.control}
-                  name="version_history"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Version History</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="e.g. v1.0 - Initial assessment"
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Track changes between versions
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </form>
-          </Form>
-        )}
-
-        <DialogFooter className="flex justify-between mt-6">
-          <div>
-            {step > 0 && (
-              <Button type="button" variant="outline" onClick={handleBack}>
-                Back
-              </Button>
-            )}
-          </div>
-          <div>
-            {step < 2 && (
-              <Button type="button" onClick={handleNext}>
-                Next
-              </Button>
-            )}
-            {step === 2 && (
-              <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Project'}
-              </Button>
-            )}
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+                </Button>
+              )}
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
+    </div>
   );
 };
 
