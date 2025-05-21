@@ -100,8 +100,13 @@ const ProjectDetails = () => {
             if (tempProject) {
               setProjectData(tempProject);
               // For temp projects, vulnerabilities would also be in localStorage
-              const tempVulnsJSON = localStorage.getItem(`vulns_${projectId}`);
+              const storageKey = `tempVulnerabilities_${projectId}`;
+              console.log('[ProjectDetails] Loading vulnerabilities with key:', storageKey);
+              const tempVulnsJSON = localStorage.getItem(storageKey);
+              console.log('[ProjectDetails] Found vulnerabilities:', !!tempVulnsJSON);
               const tempVulns = tempVulnsJSON ? JSON.parse(tempVulnsJSON) : [];
+              console.log('[ProjectDetails] Number of vulnerabilities:', tempVulns.length);
+              console.log('[ProjectDetails] Vulnerabilities:', JSON.stringify(tempVulns));
               setVulnerabilities(tempVulns);
             } else {
               throw new Error('Temporary project not found');

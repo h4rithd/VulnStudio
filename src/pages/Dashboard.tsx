@@ -46,6 +46,44 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const renderVulnerabilityCounts = (project: RecentProject) => {
+    if (!project.vulnerabilities_count) return null;
+
+    const counts = project.vulnerabilities_count;
+    return (
+      <div className="flex flex-wrap items-center gap-1 mt-1">
+        {counts.critical > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-severity-critical text-white">
+            {counts.critical} Critical
+          </span>
+        )}
+        {counts.high > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-severity-high text-white">
+            {counts.high} High
+          </span>
+        )}
+        {counts.medium > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-severity-medium text-white">
+            {counts.medium} Medium
+          </span>
+        )}
+        {counts.low > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-severity-low text-white">
+            {counts.low} Low
+          </span>
+        )}
+        {counts.info > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-severity-info text-white">
+            {counts.info} Info
+          </span>
+        )}
+        {counts.total === 0 && (
+          <span className="text-muted-foreground text-xs">No vulnerabilities</span>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!user) return;

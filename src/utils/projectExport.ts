@@ -1,11 +1,15 @@
 
 import JSZip from 'jszip';
 import { supabase } from '@/lib/supabase';
-import { Reports, Vulnerabilities } from '@/types/database.types';
 
 // Function to export a project to JSON and images as a ZIP file
 export async function exportProjectToZip(projectId: string): Promise<Blob> {
   try {
+    // Check if this is a temporary project
+    if (projectId.startsWith('temp_')) {
+      return exportTemporaryProjectToZip(projectId);
+    }
+    
     // Fetch the project data
     const { data: project, error } = await supabase
       .from('reports')
@@ -83,18 +87,29 @@ export function exportTemporaryProjectToZip(projectId: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     try {
       // Get the project from localStorage
-      const temporaryProjects = JSON.parse(localStorage.getItem('temporaryProjects') || '[]');
-      const project = temporaryProjects.find((p: any) => p.id === projectId);
+      const tempProjectsJSON = localStorage.getItem('tempProjects');
+      const tempProjects = tempProjectsJSON ? JSON.parse(tempProjectsJSON) : [];
+      const project = tempProjects.find((p: any) => p.id === projectId);
       
       if (!project) {
         throw new Error('Temporary project not found');
       }
       
+      // Get vulnerabilities for this project from localStorage
+      const vulnKey = `tempVulnerabilities_${projectId}`;
+      const vulnJSON = localStorage.getItem(vulnKey);
+      const vulnerabilities = vulnJSON ? JSON.parse(vulnJSON) : [];
+      
       // Create a new zip file
       const zip = new JSZip();
       
-      // Add project data as JSON
-      zip.file("project.json", JSON.stringify(project, null, 2));
+      // Add project data with vulnerabilities as JSON
+      const projectForExport = {
+        ...project,
+        vulnerabilities
+      };
+      
+      zip.file("project.json", JSON.stringify(projectForExport, null, 2));
       
       // Create a README file
       const readmeContent = `# Security Project Export (Temporary)
