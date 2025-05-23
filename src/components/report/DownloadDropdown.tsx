@@ -7,10 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FileDown, FileText, FileCode, ChevronDown, Download, FileType, Archive } from 'lucide-react';
+import { FileDown, FileText, FileCode, ChevronDown, Download, FileType, Archive, FileJson } from 'lucide-react';
 
 interface DownloadDropdownProps {
-  onDownload: (format: 'html' | 'markdown' | 'pdf' | 'word' | 'zip') => void;
+  onDownload: (format: 'html' | 'markdown' | 'pdf' | 'word' | 'zip' | 'json') => void;
 }
 
 export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({ onDownload }) => {
@@ -53,6 +53,10 @@ export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({ onDownload }
           <DropdownMenuItem onClick={() => onDownload('markdown')}>
             <FileCode className="mr-2 h-4 w-4" />
             <span>Download Markdown</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onDownload('json')}>
+            <FileJson className="mr-2 h-4 w-4" />
+            <span>Download JSON</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
