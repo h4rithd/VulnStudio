@@ -42,13 +42,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "attachments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "attachments_vulnerability_id_fkey"
             columns: ["vulnerability_id"]
             isOneToOne: false
@@ -64,7 +57,9 @@ export type Database = {
           end_date: string
           id: string
           preparer: string
+          preparer_email: string | null
           reviewer: string
+          reviewer_email: string | null
           scope: Json
           start_date: string
           status: string | null
@@ -79,7 +74,9 @@ export type Database = {
           end_date: string
           id?: string
           preparer: string
+          preparer_email?: string | null
           reviewer: string
+          reviewer_email?: string | null
           scope?: Json
           start_date: string
           status?: string | null
@@ -94,7 +91,9 @@ export type Database = {
           end_date?: string
           id?: string
           preparer?: string
+          preparer_email?: string | null
           reviewer?: string
+          reviewer_email?: string | null
           scope?: Json
           start_date?: string
           status?: string | null
@@ -103,40 +102,53 @@ export type Database = {
           version?: string | null
           version_history?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "reports_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
-      users: {
+      user_roles: {
         Row: {
           created_at: string | null
-          email: string
           id: string
-          name: string
-          role: string | null
-          username: string
+          role: string
+          updated_at: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
-          email: string
           id?: string
-          name: string
-          role?: string | null
-          username: string
+          role: string
+          updated_at?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
-          email?: string
           id?: string
-          name?: string
-          role?: string | null
-          username?: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          email: string | null
+          first_login: boolean | null
+          id: string
+          name: string | null
+          username: string | null
+        }
+        Insert: {
+          email?: string | null
+          first_login?: boolean | null
+          id: string
+          name?: string | null
+          username?: string | null
+        }
+        Update: {
+          email?: string | null
+          first_login?: boolean | null
+          id?: string
+          name?: string | null
+          username?: string | null
         }
         Relationships: []
       }
@@ -174,15 +186,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "vulndb_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       vulndb_backup: {
         Row: {
@@ -298,13 +302,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "vulnerabilities_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "vulnerabilities_report_id_fkey"
             columns: ["report_id"]
             isOneToOne: false
@@ -318,7 +315,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: { _user_id: string; _role: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

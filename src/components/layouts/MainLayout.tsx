@@ -1,9 +1,10 @@
 
 import { ReactNode } from 'react';
 import Navbar from '../navigation/Navbar';
-import Sidebar from '../navigation/Sidebar';
+import AppSidebar from '../navigation/Sidebar';
 import Footer from '../navigation/Footer';
 import { useAuth } from '@/context/AuthContext';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -21,16 +22,18 @@ const MainLayout = ({ children }: MainLayoutProps) => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
-          {children}
-        </main>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <SidebarInset className="flex flex-col flex-1">
+          <Navbar />
+          <main className="flex-1 p-4 md:p-6 overflow-auto">
+            {children}
+          </main>
+          <Footer />
+        </SidebarInset>
       </div>
-      <Footer />
-    </div>
+    </SidebarProvider>
   );
 };
 

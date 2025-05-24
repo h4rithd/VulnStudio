@@ -1,88 +1,169 @@
 
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Folder, Database, Settings, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react';
+import { 
+  Sidebar, 
+  SidebarContent, 
+  SidebarFooter, 
+  SidebarGroup, 
+  SidebarGroupContent, 
+  SidebarGroupLabel, 
+  SidebarHeader, 
+  SidebarMenu, 
+  SidebarMenuButton, 
+  SidebarMenuItem,
+  SidebarTrigger,
+  useSidebar
+} from '@/components/ui/sidebar';
+import { Folder, Database, Settings, BarChart2, Shield, FileText, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
-const Sidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
+const AppSidebar = () => {
   const location = useLocation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const { state } = useSidebar();
 
-  const toggleCollapse = () => {
-    setCollapsed(!collapsed);
-  };
-
-  const menuItems = [
+  const mainMenuItems = [
     {
       name: 'Dashboard',
       path: '/dashboard',
-      icon: <BarChart2 size={20} />,
+      icon: BarChart2,
+      description: 'Overview and analytics'
     },
     {
       name: 'Projects',
       path: '/projects',
-      icon: <Folder size={20} />,
+      icon: Folder,
+      description: 'Manage your projects'
     },
     {
       name: 'VulnDB',
       path: '/vulndb',
-      icon: <Database size={20} />,
+      icon: Database,
+      description: 'Vulnerability database'
     },
   ];
 
-  // Admin only menu items
-  if (isAdmin) {
-    menuItems.push({
+  const adminMenuItems = [
+    {
       name: 'Settings',
       path: '/settings',
-      icon: <Settings size={20} />,
-    });
-  }
+      icon: Settings,
+      description: 'System configuration'
+    },
+    {
+      name: 'Users',
+      path: '/users',
+      icon: Users,
+      description: 'User management'
+    },
+  ];
+
+  const isActiveRoute = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   return (
-    <aside 
-      className={cn(
-        'h-[calc(100vh-4rem)] border-r transition-all duration-300 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
-        collapsed ? 'w-16' : 'w-64'
-      )}
-    >
-      <div className="flex flex-col h-full">
-        <div className="flex-1 py-6">
-          <nav className="px-2 space-y-1">
-            {menuItems.map((item) => (
-              <Link 
-                key={item.path} 
-                to={item.path}
-                className={cn(
-                  'flex items-center py-2 px-3 text-sm font-medium rounded-md transition-all',
-                  location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) 
-                    ? 'bg-accent text-accent-foreground' 
-                    : 'hover:bg-muted/50'
-                )}
-              >
-                <div className="mr-3">{item.icon}</div>
-                {!collapsed && <span>{item.name}</span>}
-              </Link>
-            ))}
-          </nav>
+    <Sidebar collapsible="icon" className="border-r">
+      <SidebarHeader className="border-b">
+        <div className="flex items-center gap-2 px-2 py-2">
+  
+          {state === "expanded" && (
+            <div className="flex flex-col">
+              <img src="/images/logo.png" alt="VulnStudio"/>
+            </div>
+          )}
         </div>
+      </SidebarHeader>
 
-        <div className="p-4 border-t">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full flex justify-center"
-            onClick={toggleCollapse}
-          >
-            {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-          </Button>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainMenuItems.map((item) => (
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActiveRoute(item.path)}
+                    tooltip={state === "collapsed" ? item.name : undefined}
+                  >
+                    <Link to={item.path}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {isAdmin && (
+          <>
+            <Separator/>
+            <SidebarGroup>
+              <SidebarGroupLabel>Administration</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminMenuItems.map((item) => (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActiveRoute(item.path)}
+                        tooltip={state === "collapsed" ? item.name : undefined}
+                      >
+                        <Link to={item.path}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+
+        {state === "expanded" && (
+          <>
+            <Separator/>
+            <SidebarGroup>
+              <SidebarGroupLabel>Quick Actions</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/projects/new">
+                        <Folder className="h-4 w-4" />
+                        <span>New Project</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/vulndb">
+                        <Shield className="h-4 w-4" />
+                        <span>Search Vulnerabilities</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter className="border-t">
+        <div className="p-2">
+          <SidebarTrigger className="w-full" />
         </div>
-      </div>
-    </aside>
+      </SidebarFooter>
+    </Sidebar>
   );
 };
 
-export default Sidebar;
+export default AppSidebar;

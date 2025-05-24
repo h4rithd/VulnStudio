@@ -24,7 +24,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DownloadCloud, UploadCloud, AlertTriangle } from 'lucide-react';
+import { DownloadCloud, UploadCloud, AlertTriangle, UserPlus, Edit2, Shield, FileText, Settings as SettingsIcon, Database, Globe, Mail } from 'lucide-react';
+import { AddUserDialog } from '@/components/user-management/AddUserDialog';
+import { EditUserDialog } from '@/components/user-management/EditUserDialog';
+import { UserActionsDropdown } from '@/components/user-management/UserActionsDropdown';
+import { useUserManagement } from '@/hooks/useUserManagement';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
 
 const Settings = () => {
   const { isAdmin, user } = useAuth();
@@ -33,6 +46,11 @@ const Settings = () => {
   const [importLoading, setImportLoading] = useState(false);
   const [importData, setImportData] = useState<File | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  
+  const { users, loading: usersLoading, refreshUsers, deleteUser, updateUserRole } = useUserManagement();
 
   const handleExportDatabase = async () => {
     try {
@@ -124,13 +142,9 @@ const Settings = () => {
           throw new Error(`Invalid import file: ${table} data is missing or invalid`);
         }
       }
-
-      // 1. Handle conflicts (upsert)
-      // 2. Maintain referential integrity
-      // 3. Add more validation
+      
+      // Insert data into each table
       const results = await Promise.all([
-        // For each table, we'll clear it first to avoid duplicates
-        // Note: Real implementations would handle this more gracefully
         supabase.from('vulnDB').upsert(importedData.vulnDB.map((item: any) => ({
           ...item,
           created_at: new Date(item.created_at).toISOString(),
@@ -176,6 +190,20 @@ const Settings = () => {
     }
   };
 
+  const handleEditUser = (userData: User) => {
+    setSelectedUser(userData);
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleUserAdded = () => {
+    refreshUsers();
+  };
+
+  const handleUserUpdated = () => {
+    refreshUsers();
+    setSelectedUser(null);
+  };
+
   if (!isAdmin) {
     return (
       <MainLayout>
@@ -197,15 +225,35 @@ const Settings = () => {
     <MainLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Configure application settings</p>
+        <p className="text-muted-foreground">Configure application settings and manage users</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="export">Export/Import</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="general" className="flex items-center gap-2">
+            <SettingsIcon className="h-4 w-4" />
+            General
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
+            Reports
+          </TabsTrigger>
+          <TabsTrigger value="data" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Data
+          </TabsTrigger>
+          <TabsTrigger value="integration" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Integration
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -217,20 +265,47 @@ const Settings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <Select defaultValue="UTC">
+                    <SelectTrigger id="timezone">
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UTC">UTC</SelectItem>
+                      <SelectItem value="GMT">GMT</SelectItem>
+                      <SelectItem value="EST">Eastern Time (EST)</SelectItem>
+                      <SelectItem value="CST">Central Time (CST)</SelectItem>
+                      <SelectItem value="PST">Pacific Time (PST)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="language">Default Language</Label>
+                  <Select defaultValue="en">
+                    <SelectTrigger id="language">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="es">Spanish</SelectItem>
+                      <SelectItem value="fr">French</SelectItem>
+                      <SelectItem value="de">German</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="timezone">Timezone</Label>
-                <Select defaultValue="UTC">
-                  <SelectTrigger id="timezone">
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="GMT">GMT</SelectItem>
-                    <SelectItem value="EST">Eastern Time (EST)</SelectItem>
-                    <SelectItem value="CST">Central Time (CST)</SelectItem>
-                    <SelectItem value="PST">Pacific Time (PST)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="company-name">Company Name</Label>
+                <Input id="company-name" placeholder="Your Company Name" />
+              </div>
+
+              <div>
+                <Label htmlFor="company-logo">Company Logo URL</Label>
+                <Input id="company-logo" placeholder="https://vulnstudio.com/logo.png" />
               </div>
               
               <div className="flex justify-end">
@@ -243,134 +318,319 @@ const Settings = () => {
         <TabsContent value="users" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>
-                Manage users and their permissions
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>User Management</CardTitle>
+                  <CardDescription>
+                    Manage all registered users and their permissions ({users.length} total users)
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setIsAddUserDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add User
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Admin User</TableCell>
-                    <TableCell>admin@vulnstudio.com</TableCell>
-                    <TableCell>Admin</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Edit</Button>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Auditor User</TableCell>
-                    <TableCell>auditor@vulnstudio.com</TableCell>
-                    <TableCell>Auditor</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Edit</Button>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-              
-              <div className="mt-4 flex justify-end">
-                <Button>Add User</Button>
+              {usersLoading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <p className="mt-2 text-muted-foreground">Loading users...</p>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-8">
+                  <UserPlus className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <p className="mt-2 text-muted-foreground">No users found</p>
+                  <p className="text-sm text-muted-foreground">
+                    Users who sign up will appear here automatically
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>First Login</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((userData) => (
+                      <TableRow key={userData.id}>
+                        <TableCell className="font-medium">{userData.name}</TableCell>
+                        <TableCell>{userData.email}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            userData.role === 'admin' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {userData.role === 'admin' ? 'Admin' : 'Auditor'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Active
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            userData.first_login 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {userData.first_login ? 'Completed' : 'Pending'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(userData.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <UserActionsDropdown
+                            user={userData}
+                            onEdit={handleEditUser}
+                            onDelete={deleteUser}
+                            onRoleChange={updateUserRole}
+                            currentUserId={user?.id}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>
+                Configure security and authentication settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Session Timeout</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Auto-logout after inactivity
+                  </p>
+                </div>
+                <Select defaultValue="30">
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 minutes</SelectItem>
+                    <SelectItem value="30">30 minutes</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="allowed-domains">Allowed Email Domains</Label>
+                <Textarea 
+                  id="allowed-domains"
+                  placeholder="@company.com&#10;@h4rithd.com"
+                  className="mt-1"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  One domain per line. Leave empty to allow all domains.
+                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="templates" className="space-y-6">
+        <TabsContent value="reports" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Report Templates</CardTitle>
+              <CardTitle>Report Generation Settings</CardTitle>
               <CardDescription>
-                Configure report templates
+                Configure default settings for vulnerability reports
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="template">Default Template</Label>
-                <Select defaultValue="default">
-                  <SelectTrigger id="template">
-                    <SelectValue placeholder="Select template" />
+                <Label htmlFor="report-footer">Default Report Footer</Label>
+                <Textarea 
+                  id="report-footer"
+                  placeholder="Confidential - For internal use only"
+                  className="mt-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>CVSS Settings</CardTitle>
+              <CardDescription>
+                Configure CVSS scoring defaults
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="cvss-version">CVSS Version</Label>
+                <Select defaultValue="3.1">
+                  <SelectTrigger id="cvss-version">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="default">Default Template</SelectItem>
-                    <SelectItem value="minimal">Minimal Template</SelectItem>
-                    <SelectItem value="detailed">Detailed Template</SelectItem>
+                    <SelectItem value="3.1">CVSS 3.1</SelectItem>
+                    <SelectItem value="3.0">CVSS 3.0</SelectItem>
+                    <SelectItem value="2.0">CVSS 2.0</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div>
-                <Label htmlFor="upload-template">Upload New Template</Label>
-                <div className="flex gap-3 mt-1.5">
-                  <Input id="upload-template" type="file" />
-                  <Button>Upload</Button>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Auto-calculate Environmental Score</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Include environmental metrics in scoring
+                  </p>
+                </div>
+                <Switch />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="data" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Management</CardTitle>
+              <CardDescription>
+                Export and import vulnerability data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Export Database</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Download all vulnerability data as JSON
+                  </p>
+                  <Button 
+                    onClick={handleExportDatabase} 
+                    disabled={exportLoading}
+                    className="w-full"
+                  >
+                    <DownloadCloud className="mr-2 h-4 w-4" />
+                    {exportLoading ? 'Exporting...' : 'Export Data'}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium">Import Database</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Upload vulnerability data from JSON file
+                  </p>
+                  <div className="space-y-2">
+                    <Input
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportFile}
+                    />
+                    <Button
+                      onClick={() => setIsImportDialogOpen(true)}
+                      disabled={!importData || importLoading}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      <UploadCloud className="mr-2 h-4 w-4" />
+                      Import Data
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Data Import Warning</p>
+                    <p className="text-sm text-muted-foreground">
+                      Importing data will merge with existing records. Make sure to backup your data before importing.
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="export" className="space-y-6">
+        <TabsContent value="integration" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Export and Import</CardTitle>
+              <CardTitle>External Integrations</CardTitle>
               <CardDescription>
-                Export database for backup or import from an existing file
+                Configure integrations with external services
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Export Database</h3>
-                <p className="text-sm text-muted-foreground">
-                  Download a JSON file with all your data for backup or transfer purposes
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    onClick={handleExportDatabase} 
-                    disabled={exportLoading}
-                    className="mt-2"
-                  >
-                    {exportLoading ? (
-                      <>Exporting...</>
-                    ) : (
-                      <>
-                        <DownloadCloud className="mr-2 h-4 w-4" />
-                        Export Database
-                      </>
-                    )}
-                  </Button>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="email-service">Email Service</Label>
+                <Select defaultValue="smtp">
+                  <SelectTrigger id="email-service">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="smtp">SMTP</SelectItem>
+                    <SelectItem value="sendgrid">SendGrid</SelectItem>
+                    <SelectItem value="mailgun">Mailgun</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="smtp-server">SMTP Server</Label>
+                <Input id="smtp-server" placeholder="smtp.gmail.com" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="smtp-port">SMTP Port</Label>
+                  <Input id="smtp-port" placeholder="587" />
+                </div>
+                <div>
+                  <Label htmlFor="smtp-security">Security</Label>
+                  <Select defaultValue="tls">
+                    <SelectTrigger id="smtp-security">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tls">TLS</SelectItem>
+                      <SelectItem value="ssl">SSL</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              
-              <div className="space-y-2 pt-4 border-t">
-                <h3 className="text-lg font-medium">Import Data</h3>
-                <p className="text-sm text-muted-foreground">
-                  Import data from a previous export
-                </p>
-                <div className="flex gap-3 mt-1.5">
-                  <Input type="file" accept=".json" onChange={handleImportFile} />
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsImportDialogOpen(true)}
-                    disabled={!importData}
-                  >
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    Import
-                  </Button>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Slack Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Send notifications to Slack channels
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <AlertTriangle className="h-3 w-3 mr-1 text-amber-500" />
-                  Warning: This will merge with or replace existing data
-                </p>
+                <Switch />
+              </div>
+
+              <div>
+                <Label htmlFor="slack-webhook">Slack Webhook URL</Label>
+                <Input id="slack-webhook" placeholder="https://hooks.slack.com/..." />
               </div>
             </CardContent>
           </Card>
@@ -399,6 +659,21 @@ const Settings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add User Dialog */}
+      <AddUserDialog
+        open={isAddUserDialogOpen}
+        onOpenChange={setIsAddUserDialogOpen}
+        onUserAdded={handleUserAdded}
+      />
+
+      {/* Edit User Dialog */}
+      <EditUserDialog
+        open={isEditUserDialogOpen}
+        onOpenChange={setIsEditUserDialogOpen}
+        user={selectedUser}
+        onUserUpdated={handleUserUpdated}
+      />
     </MainLayout>
   );
 };

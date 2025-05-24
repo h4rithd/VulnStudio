@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -12,6 +13,7 @@ interface AuthContextProps {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
+  firstLogin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, username: string, name: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -22,6 +24,7 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [firstLogin, setFirstLogin] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,6 +44,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('[AuthContext] Session ended');
         setUser(null);
         setIsAdmin(false);
+        setFirstLogin(false);
         setLoading(false);
       }
     });
@@ -79,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
   
-  // Fetch additional user info from the database
+  // Fetch additional user info from the database and check role
   const fetchAndSetUser = async (session: Session) => {
     if (!session?.user?.id) return;
     
@@ -100,16 +104,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data) {
         console.log('[AuthContext] User data fetched:', data.email);
         setUser(data);
-        setIsAdmin(data.role === 'admin');
+        setFirstLogin(data.first_login || false);
+        
+        // Check user role using the new role system
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (roleError) {
+          console.error('[AuthContext] Error fetching user role:', roleError);
+          setIsAdmin(false);
+        } else {
+          console.log('[AuthContext] User role:', roleData?.role);
+          setIsAdmin(roleData?.role === 'admin');
+        }
       } else {
         console.log('[AuthContext] User data not found in database, using session user');
         setUser(session.user);
         setIsAdmin(false);
+        setFirstLogin(false);
       }
     } catch (error) {
       console.error('[AuthContext] Error in fetchAndSetUser:', error);
       // Fall back to session user if database fetch fails
       setUser(session.user);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -148,6 +169,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('[AuthContext] Sign up error:', error);
       } else {
         console.log('[AuthContext] Sign up successful');
+        
+        // Create user profile entry with username and name
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.user?.id) {
+          const { error: profileError } = await supabase
+            .from('users')
+            .upsert({
+              id: sessionData.session.user.id,
+              email,
+              username,
+              name,
+              first_login: false
+            });
+          
+          if (profileError) {
+            console.error('[AuthContext] Error creating user profile:', profileError);
+            toast({
+              title: 'Profile Creation Error',
+              description: 'Your account was created but there was a problem setting up your profile.',
+              variant: 'destructive'
+            });
+          }
+        }
       }
       
       return { error };
@@ -173,6 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     loading,
     isAdmin,
+    firstLogin,
     signIn,
     signUp,
     signOut

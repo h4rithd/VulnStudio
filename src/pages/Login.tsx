@@ -91,7 +91,7 @@ const Login = () => {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="admin@example.com" {...field} />
+                    <Input placeholder="admin@vulnstudio.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -125,10 +125,6 @@ const Login = () => {
             </Button>
           </form>
         </Form>
-        
-        {/* <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Default email: <strong>admin@h4rithd.com</strong>, password: <strong>password1234</strong></p>
-        </div> */}
       </div>
     </AuthLayout>
   );

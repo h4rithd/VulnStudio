@@ -1,124 +1,101 @@
 
-// Follow this setup guide to integrate the Deno runtime and use Edge Functions:
-// https://deno.com/manual/runtime/edge_functions
-
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.0';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
-serve(async (req: Request) => {
-  // Handle CORS preflight requests
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
 
   try {
-    console.log('Creating admin user');
-
-    // First, check if the admin user already exists in auth.users
-    const { data: existingUsers, error: checkError } = await supabase.auth.admin.listUsers();
+    const { email, password, name, role } = await req.json()
     
-    if (checkError) {
-      throw checkError;
-    }
+    console.log('Creating admin user with:', { email, name, role })
 
-    // Check if the admin user already exists
-    const adminExists = existingUsers.users.some(user => 
-      user.email === 'admin@h4rithd.com' || 
-      user.user_metadata?.username === 'admin'
-    );
-
-    if (adminExists) {
-      // Even if admin exists, make sure their password is correct by updating it
-      const adminUser = existingUsers.users.find(user => 
-        user.email === 'admin@h4rithd.com' || 
-        user.user_metadata?.username === 'admin'
-      );
-      
-      if (adminUser) {
-        // Update the admin user's password
-        await supabase.auth.admin.updateUserById(adminUser.id, {
-          password: 'password1234',
-          email_confirm: true
-        });
+    // Create Supabase admin client
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
       }
-      
-      return new Response(
-        JSON.stringify({ message: 'Admin user already exists and password updated' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    )
 
-    // Create the admin user with email/password
-    const { data: adminUser, error: createError } = await supabase.auth.admin.createUser({
-      email: 'admin@h4rithd.com',
-      password: 'password1234',
+    // Create the user in auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
       email_confirm: true,
-      user_metadata: { 
-        username: 'admin',
-        name: 'Harith Dilshan'
-      },
-      app_metadata: {
-        role: 'admin'
-      }
-    });
+      user_metadata: { name }
+    })
 
-    if (createError) {
-      throw createError;
+    if (authError) {
+      console.error('Auth error:', authError)
+      throw authError
     }
 
-    // Check if the admin user was created in the users table
-    const { data: existingUserInTable } = await supabase
+    if (!authData.user) {
+      throw new Error('User creation failed - no user returned')
+    }
+
+    console.log('User created in auth:', authData.user.id)
+
+    // Insert user profile
+    const { error: profileError } = await supabaseAdmin
       .from('users')
-      .select('*')
-      .eq('username', 'admin')
-      .single();
-      
-    if (!existingUserInTable && adminUser.user) {
-      // If not exists in the users table, insert it
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: adminUser.user.id,
-          email: 'admin@h4rithd.com',
-          name: 'Harith Dilshan',
-          role: 'admin',
-          username: 'admin'
-        });
-        
-      if (insertError) {
-        throw insertError;
-      }
-    } else if (existingUserInTable && adminUser.user) {
-      // Make sure the ID matches
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ id: adminUser.user.id })
-        .eq('username', 'admin');
+      .insert({
+        id: authData.user.id,
+        email,
+        name,
+        first_login: false
+      })
 
-      if (updateError) {
-        throw updateError;
-      }
+    if (profileError) {
+      console.error('Profile creation error:', profileError)
+      // Don't throw here as the user might already exist in profiles
     }
+
+    // Assign role in user_roles table
+    const { error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({
+        user_id: authData.user.id,
+        role: role || 'admin'
+      })
+
+    if (roleError) {
+      console.error('Role assignment error:', roleError)
+      // Don't throw here as the role might already be assigned
+    }
+
+    console.log('User created successfully')
 
     return new Response(
-      JSON.stringify({ message: 'Admin user created successfully', user: adminUser }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      JSON.stringify({ 
+        success: true, 
+        user: { id: authData.user.id, email, name, role } 
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      },
+    )
   } catch (error) {
-    console.error('Error creating admin user:', error);
+    console.error('Error creating admin user:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      },
+    )
   }
-});
+})
