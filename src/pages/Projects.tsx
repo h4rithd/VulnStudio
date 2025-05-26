@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
@@ -46,6 +45,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import ProjectImportButton from '@/components/project/ProjectImportButton';
+import { DuplicateProjectDialog } from '@/components/project/DuplicateProjectDialog';
 
 interface ProjectWithVulnerabilities extends Reports {
   vulnerabilities_count?: {
@@ -318,15 +318,10 @@ const Projects = () => {
     }
   };
 
-  const handleDuplicateProject = async (type: 'duplicate' | 'retest') => {
+  const handleDuplicateProject = async (projectTitle: string, version: string, type: 'duplicate' | 'retest') => {
     if (!projectToDuplicate) return;
 
     try {
-      // Create a new project record based on the original
-      const newTitle = type === 'retest'
-        ? `Re-test: ${projectToDuplicate.title.replace(/^Re-test:\s*/g, '')}`
-        : `Copy of ${projectToDuplicate.title}`;
-
       if (projectToDuplicate.isTemporary) {
         // Duplicate temporary project
         const tempProjectsJSON = localStorage.getItem('tempProjects');
@@ -337,7 +332,8 @@ const Projects = () => {
           const newProject = {
             ...projectToDuplicate,
             id: `temp_${Math.random().toString(36).substr(2, 16)}`,
-            title: newTitle,
+            title: projectTitle,
+            version: version,
             status: 'draft',
             created_at: new Date().toISOString()
           };
@@ -378,13 +374,13 @@ const Projects = () => {
         const { data: newProject, error: projectError } = await supabase
           .from('reports')
           .insert({
-            title: newTitle,
+            title: projectTitle,
+            version: version,
             start_date: projectToDuplicate.start_date,
             end_date: projectToDuplicate.end_date,
             preparer: projectToDuplicate.preparer,
             reviewer: projectToDuplicate.reviewer,
             scope: projectToDuplicate.scope,
-            version: projectToDuplicate.version,
             status: 'draft',
             created_by: projectToDuplicate.created_by
           })
@@ -804,29 +800,14 @@ const Projects = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Duplicate/Re-test Confirmation Dialog */}
-      <AlertDialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {duplicateType === 'retest' ? 'Create Re-test Project' : 'Duplicate Project'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {duplicateType === 'retest'
-                ? 'This will create a new project for re-testing with all the same vulnerabilities.'
-                : 'This will create an exact copy of the project and all its vulnerabilities.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleDuplicateProject(duplicateType)}
-            >
-              {duplicateType === 'retest' ? 'Create Re-test' : 'Duplicate'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Duplicate/Re-test Dialog */}
+      <DuplicateProjectDialog
+        project={projectToDuplicate}
+        isOpen={duplicateDialogOpen}
+        onClose={() => setDuplicateDialogOpen(false)}
+        onConfirm={handleDuplicateProject}
+        type={duplicateType}
+      />
     </MainLayout>
   );
 };
