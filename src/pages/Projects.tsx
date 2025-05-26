@@ -17,7 +17,9 @@ import {
   Search,
   Archive,
   AlertTriangle,
-  AppWindow
+  AppWindow,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
@@ -74,6 +76,8 @@ interface TempProject {
   scope: Array<{ value: string }>;
   status: string;
   created_at: string;
+  updated_at?: string;
+  created_by?: string;
 }
 
 interface TempVulnerability {
@@ -89,6 +93,9 @@ interface TempVulnerability {
   created_at: string;
 }
 
+type SortField = 'title' | 'status' | 'created_at' | 'start_date' | 'version';
+type SortDirection = 'asc' | 'desc';
+
 const Projects = () => {
   const [projects, setProjects] = useState<ProjectWithVulnerabilities[]>([]);
   const [tempProjects, setTempProjects] = useState<ProjectWithVulnerabilities[]>([]);
@@ -101,6 +108,8 @@ const Projects = () => {
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   useEffect(() => {
     fetchProjects();
@@ -193,7 +202,9 @@ const Projects = () => {
             ...project,
             vulnerabilities_count: vulnCounts,
             is_retest: isRetest,
-            isTemporary: true
+            isTemporary: true,
+            updated_at: project.updated_at || project.created_at,
+            created_by: project.created_by || 'temp-user'
           };
         });
         
@@ -207,6 +218,20 @@ const Projects = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
   };
 
   const handleDeleteProject = async (id: string) => {
@@ -482,6 +507,29 @@ const Projects = () => {
     project.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Sort projects
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    if (sortField === 'created_at' || sortField === 'start_date') {
+      aValue = new Date(a[sortField]).getTime();
+      bValue = new Date(b[sortField]).getTime();
+    }
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortDirection === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+
+    return 0;
+  });
+
   // Render vulnerability counts with colored badges
   const renderVulnerabilityCounts = (project: ProjectWithVulnerabilities) => {
     if (!project.vulnerabilities_count) return null;
@@ -546,16 +594,48 @@ const Projects = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Project Title</TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('title')}
+              >
+                <div className="flex items-center gap-2">
+                  Project Title
+                  {getSortIcon('title')}
+                </div>
+              </TableHead>
               <TableHead className="w-auto">Vulnerabilities</TableHead>
-              <TableHead className="w-[100px] text-center">Version</TableHead>
-              <TableHead className="w-[200px] text-center">Date Range</TableHead>
-              <TableHead className="w-[100px] text-center">Status</TableHead>
+              <TableHead 
+                className="w-[100px] text-center cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('version')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Version
+                  {getSortIcon('version')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="w-[200px] text-center cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('start_date')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Date Range
+                  {getSortIcon('start_date')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="w-[100px] text-center cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('status')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Status
+                  {getSortIcon('status')}
+                </div>
+              </TableHead>
               <TableHead className="w-[60px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProjects.map((project) => (
+            {sortedProjects.map((project) => (
               <TableRow key={project.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
@@ -759,23 +839,23 @@ const Projects = () => {
           <TabsTrigger value="retest">Retests</TabsTrigger>
         </TabsList>
         <TabsContent value="all" className="space-y-4">
-          {renderProjects(filteredProjects)}
+          {renderProjects(sortedProjects)}
         </TabsContent>
 
         <TabsContent value="temp" className="space-y-4">
-          {renderProjects(filteredProjects.filter(p => p.isTemporary))}
+          {renderProjects(sortedProjects.filter(p => p.isTemporary))}
         </TabsContent>
 
         <TabsContent value="draft" className="space-y-4">
-          {renderProjects(filteredProjects.filter(p => p.status === 'draft'))}
+          {renderProjects(sortedProjects.filter(p => p.status === 'draft'))}
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-4">
-          {renderProjects(filteredProjects.filter(p => p.status === 'completed'))}
+          {renderProjects(sortedProjects.filter(p => p.status === 'completed'))}
         </TabsContent>
 
         <TabsContent value="retest" className="space-y-4">
-          {renderProjects(filteredProjects.filter(p => p.is_retest))}
+          {renderProjects(sortedProjects.filter(p => p.is_retest))}
         </TabsContent>
       </Tabs>
 

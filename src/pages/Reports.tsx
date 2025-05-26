@@ -22,7 +22,9 @@ import {
   LibraryBig,
   FileArchive,
   UserRoundPen, 
-  UserRoundCheck
+  UserRoundCheck,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -52,12 +54,17 @@ interface ProjectReport {
   isTemporary?: boolean;
 }
 
+type SortField = 'title' | 'preparer' | 'reviewer' | 'vulnerabilities_count' | 'version' | 'created_at' | 'status';
+type SortDirection = 'asc' | 'desc';
+
 const Reports = () => {
   const [reports, setReports] = useState<ProjectReport[]>([]);
   const [tempReports, setTempReports] = useState<ProjectReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -131,6 +138,20 @@ const Reports = () => {
     }
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
+  };
+
   const handleDownload = (reportId: string, format: 'html' | 'markdown' | 'pdf' | 'word' | 'zip' | 'json') => {
     if (format === 'zip') {
       handleExportProject(reportId);
@@ -179,6 +200,33 @@ const Reports = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Sort reports
+  const sortedReports = [...filteredReports].sort((a, b) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    // Handle special cases
+    if (sortField === 'vulnerabilities_count') {
+      aValue = a.vulnerabilities_count || 0;
+      bValue = b.vulnerabilities_count || 0;
+    } else if (sortField === 'created_at') {
+      aValue = new Date(a.created_at).getTime();
+      bValue = new Date(b.created_at).getTime();
+    }
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortDirection === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+
+    return 0;
+  });
+
   return (
     <MainLayout>
       <div className="mb-6">
@@ -222,7 +270,7 @@ const Reports = () => {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-spin h-10 w-10 border-4 border-secondary border-t-transparent rounded-full"></div>
         </div>
-      ) : filteredReports.length === 0 ? (
+      ) : sortedReports.length === 0 ? (
         <div className="text-center py-12">
           <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No reports found</h3>
@@ -237,19 +285,67 @@ const Reports = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Project Title</TableHead>
-                <TableHead className="hidden md:table-cell">Preparer</TableHead>
-                <TableHead className="hidden md:table-cell">Reviewer</TableHead>
-                <TableHead className="text-center">Vulnerabilities</TableHead>
-                <TableHead className="text-center">Version</TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort('title')}
+                >
+                  <div className="flex items-center gap-2">
+                    Project Title
+                    {getSortIcon('title')}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="hidden md:table-cell cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort('preparer')}
+                >
+                  <div className="flex items-center gap-2">
+                    Preparer
+                    {getSortIcon('preparer')}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="hidden md:table-cell cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort('reviewer')}
+                >
+                  <div className="flex items-center gap-2">
+                    Reviewer
+                    {getSortIcon('reviewer')}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="text-center cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort('vulnerabilities_count')}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    Vulnerabilities
+                    {getSortIcon('vulnerabilities_count')}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="text-center cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort('version')}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    Version
+                    {getSortIcon('version')}
+                  </div>
+                </TableHead>
                 <TableHead className="hidden lg:table-cell text-center">Date Range</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead 
+                  className="text-center cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    Status
+                    {getSortIcon('status')}
+                  </div>
+                </TableHead>
                 <TableHead className="text-center"></TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredReports.map((report) => (
+              {sortedReports.map((report) => (
                 <TableRow key={report.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
@@ -295,7 +391,6 @@ const Reports = () => {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-
                     <Button
                       variant="outline"
                       size="sm"
