@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DownloadCloud, UploadCloud, AlertTriangle, UserPlus, Edit2, Shield, FileText, Settings as SettingsIcon, Database, Globe, Mail } from 'lucide-react';
+import { DownloadCloud, UploadCloud, AlertTriangle, UserPlus, Edit2, Shield, FileText, Settings as SettingsIcon, Database, Globe, SlidersVertical } from 'lucide-react';
 import { AddUserDialog } from '@/components/user-management/AddUserDialog';
 import { EditUserDialog } from '@/components/user-management/EditUserDialog';
 import { UserActionsDropdown } from '@/components/user-management/UserActionsDropdown';
@@ -224,7 +224,10 @@ const Settings = () => {
   return (
     <MainLayout>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <SlidersVertical className="h-10 w-10" />
+            Settings
+          </h1>
         <p className="text-muted-foreground">Configure application settings and manage users</p>
       </div>
 

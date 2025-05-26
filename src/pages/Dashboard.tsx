@@ -3,12 +3,23 @@ import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, FileEdit, RotateCcw, Clock, CheckCircle, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
+
+interface RecentProject extends Reports {
+  vulnerabilities_count?: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+}
 
 interface DashboardStats {
   totalProjects: number;
@@ -30,7 +41,7 @@ const COLORS = ['#c161a1', '#ee6c6e', '#ea9c6b', '#a0c878', '#7acbd5'];
 
 const Dashboard = () => {
   const { user, isAdmin } = useAuth();
-  const [recentProjects, setRecentProjects] = useState<Reports[]>([]);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
     completedProjects: 0,
@@ -44,6 +55,8 @@ const Dashboard = () => {
     monthlyActivity: [],
   });
   const [loading, setLoading] = useState(true);
+  const [pendingDrafts, setPendingDrafts] = useState(0);
+  const [retestProjects, setRetestProjects] = useState(0);
   const { toast } = useToast();
 
   const renderVulnerabilityCounts = (project: RecentProject) => {
@@ -101,7 +114,46 @@ const Dashboard = () => {
         if (projectsError) throw projectsError;
         
         if (projects) {
-          setRecentProjects(projects);
+          const projectsWithVulnCounts: RecentProject[] = await Promise.all(
+            projects.map(async (project) => {
+              // Get vulnerability counts for each project
+              const { data: vulnData, error: vulnError } = await supabase
+                .from('vulnerabilities')
+                .select('severity')
+                .eq('report_id', project.id);
+
+              if (vulnError) {
+                console.error("Error fetching vulnerabilities:", vulnError);
+                return {
+                  ...project,
+                  vulnerabilities_count: {
+                    total: 0,
+                    critical: 0,
+                    high: 0,
+                    medium: 0,
+                    low: 0,
+                    info: 0,
+                  },
+                };
+              }
+
+              const vulnCounts = {
+                total: vulnData?.length || 0,
+                critical: vulnData?.filter(v => v.severity === 'critical').length || 0,
+                high: vulnData?.filter(v => v.severity === 'high').length || 0,
+                medium: vulnData?.filter(v => v.severity === 'medium').length || 0,
+                low: vulnData?.filter(v => v.severity === 'low').length || 0,
+                info: vulnData?.filter(v => v.severity === 'info').length || 0,
+              };
+
+              return {
+                ...project,
+                vulnerabilities_count: vulnCounts,
+              };
+            })
+          );
+          
+          setRecentProjects(projectsWithVulnCounts);
         }
 
         // Fetch total projects count
@@ -118,6 +170,22 @@ const Dashboard = () => {
           .eq('status', 'completed');
         
         if (completedError) throw completedError;
+
+        // Fetch pending drafts count
+        const { count: draftCount, error: draftError } = await supabase
+          .from('reports')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'draft');
+        
+        if (draftError) throw draftError;
+
+        // Fetch retest projects count (using in-progress as retest indicator)
+        const { count: retestCount, error: retestError } = await supabase
+          .from('reports')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'in-progress');
+        
+        if (retestError) throw retestError;
         
         // Fetch vulnerability counts by severity
         const { data: vulnData, error: vulnError } = await supabase
@@ -144,6 +212,9 @@ const Dashboard = () => {
 
         // Generate monthly activity data
         const monthlyActivity = generateMonthlyActivity(projects || []);
+        
+        setPendingDrafts(draftCount || 0);
+        setRetestProjects(retestCount || 0);
         
         setStats({
           totalProjects: totalCount || 0,
@@ -202,7 +273,10 @@ const Dashboard = () => {
     <MainLayout>
       <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <LayoutDashboard className="h-10 w-10" />
+            Dashboard
+            </h1>
           <p className="text-muted-foreground">Overview of your security testing projects</p>
         </div>
         {isAdmin && (
@@ -229,46 +303,69 @@ const Dashboard = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Card>
+            <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-[#23486A]/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <div className="p-2 bg-[#23486A]/20 rounded-lg">
+                    <FileEdit className="h-4 w-4 text-[#23486A] animate-pulse" />
+                  </div>
+                  Total Projects
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalProjects}</div>
+                <div className="text-2xl font-bold animate-fade-in">{stats.totalProjects}</div>
                 <p className="text-xs text-muted-foreground mt-1">Projects created</p>
               </CardContent>
             </Card>
-            <Card>
+            
+            <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-[#3F7D58]/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <div className="p-2 bg-[#3F7D58]/20 rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-[#3F7D58] animate-pulse" />
+                  </div>
+                  Completed
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.completedProjects}</div>
+                <div className="text-2xl font-bold animate-fade-in">{stats.completedProjects}</div>
                 <p className="text-xs text-muted-foreground mt-1">Projects completed</p>
               </CardContent>
             </Card>
-            <Card>
+            
+            <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-[#F4631E]/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Critical Findings</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <div className="p-2 bg-[#F4631E]/20 rounded-lg">
+                    <Clock className="h-4 w-4 text-[#F4631E] animate-pulse" />
+                  </div>
+                  Pending in Draft
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.vulnerabilities.critical}</div>
-                <p className="text-xs text-muted-foreground mt-1">Critical vulnerabilities found</p>
+                <div className="text-2xl font-bold animate-fade-in">{pendingDrafts}</div>
+                <p className="text-xs text-muted-foreground mt-1">Projects in draft status</p>
               </CardContent>
             </Card>
-            <Card>
+            
+            <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-[#7C4585]/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">High Findings</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <div className="p-2 bg-[#7C4585]/20 rounded-lg">
+                    <RotateCcw className="h-4 w-4 text-[#7C4585] animate-pulse" />
+                  </div>
+                  Re-test
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.vulnerabilities.high}</div>
-                <p className="text-xs text-muted-foreground mt-1">High vulnerabilities found</p>
+                <div className="text-2xl font-bold animate-fade-in">{retestProjects}</div>
+                <p className="text-xs text-muted-foreground mt-1">Projects requiring re-testing</p>
               </CardContent>
             </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-            <Card>
+            <Card className="hover:shadow-md hover:scale-[1.02] transition-all duration-200">
               <CardHeader>
                 <CardTitle>Vulnerability Severity Breakdown</CardTitle>
                 <CardDescription>Distribution of vulnerabilities by severity</CardDescription>
@@ -299,7 +396,7 @@ const Dashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="hover:shadow-md hover:scale-[1.02] transition-all duration-200">
               <CardHeader>
                 <CardTitle>Monthly Activity</CardTitle>
                 <CardDescription>Projects completed by month</CardDescription>
@@ -311,7 +408,7 @@ const Dashboard = () => {
                       <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#A0C878" />
+                      <Bar dataKey="value" fill="#3E5879" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -335,6 +432,7 @@ const Dashboard = () => {
                           <p className="text-sm text-muted-foreground">
                             {new Date(project.created_at!).toLocaleDateString()}
                           </p>
+                          {renderVulnerabilityCounts(project)}
                         </div>
                         <Button variant="outline" size="sm" asChild>
                           <Link to={`/projects/${project.id}`}>View</Link>

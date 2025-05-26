@@ -14,10 +14,11 @@ import {
   SidebarTrigger,
   useSidebar
 } from '@/components/ui/sidebar';
-import { Folder, Database, Settings, BarChart2, Shield, FileText, Users } from 'lucide-react';
+import { AppWindow, Package2, Settings, LayoutDashboard, Shield, LibraryBig, Users, Plus, Search as SearchIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 const AppSidebar = () => {
   const location = useLocation();
@@ -28,20 +29,30 @@ const AppSidebar = () => {
     {
       name: 'Dashboard',
       path: '/dashboard',
-      icon: BarChart2,
-      description: 'Overview and analytics'
+      icon: LayoutDashboard,
+      description: 'Overview and analytics',
+      badge: null
     },
     {
       name: 'Projects',
       path: '/projects',
-      icon: Folder,
-      description: 'Manage your projects'
+      icon: AppWindow,
+      description: 'Manage your projects',
+      badge: null
+    },
+    {
+      name: 'Reports',
+      path: '/reports',
+      icon: LibraryBig,
+      description: 'View all reports',
+      badge: null
     },
     {
       name: 'VulnDB',
       path: '/vulndb',
-      icon: Database,
-      description: 'Vulnerability database'
+      icon: Package2,
+      description: 'Vulnerability database',
+      badge: null
     },
   ];
 
@@ -50,14 +61,9 @@ const AppSidebar = () => {
       name: 'Settings',
       path: '/settings',
       icon: Settings,
-      description: 'System configuration'
-    },
-    {
-      name: 'Users',
-      path: '/users',
-      icon: Users,
-      description: 'User management'
-    },
+      description: 'System configuration',
+      badge: null
+    }
   ];
 
   const isActiveRoute = (path: string) => {
@@ -68,10 +74,9 @@ const AppSidebar = () => {
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader className="border-b">
         <div className="flex items-center gap-2 px-2 py-2">
-  
           {state === "expanded" && (
             <div className="flex flex-col">
-              <img src="/images/logo.png" alt="VulnStudio"/>
+              <img src="/images/logo.png" alt="VulnStudio" className="h-8 w-auto"/>
             </div>
           )}
         </div>
@@ -82,20 +87,35 @@ const AppSidebar = () => {
           <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainMenuItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActiveRoute(item.path)}
-                    tooltip={state === "collapsed" ? item.name : undefined}
-                  >
-                    <Link to={item.path}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.name}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainMenuItems.map((item) => {
+                const isActive = isActiveRoute(item.path);
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={state === "collapsed" ? item.name : undefined}
+                      className={`
+                        relative transition-all duration-200 hover:scale-[1.02]
+                        ${isActive ? 'bg-primary/10 text-primary shadow-sm' : ''}
+                      `}
+                    >
+                      <Link to={item.path} className="flex items-center gap-3 w-full">
+                        <item.icon className={`h-4 w-4 ${isActive ? 'text-primary animate-pulse' : ''}`} />
+                        <span className={isActive ? 'font-medium' : ''}>{item.name}</span>
+                        {item.badge && state === "expanded" && (
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {item.badge}
+                          </Badge>
+                        )}
+                        {isActive && (
+                          <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-r-full animate-fade-in"></div>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -107,20 +127,30 @@ const AppSidebar = () => {
               <SidebarGroupLabel>Administration</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {adminMenuItems.map((item) => (
-                    <SidebarMenuItem key={item.path}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActiveRoute(item.path)}
-                        tooltip={state === "collapsed" ? item.name : undefined}
-                      >
-                        <Link to={item.path}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.name}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {adminMenuItems.map((item) => {
+                    const isActive = isActiveRoute(item.path);
+                    return (
+                      <SidebarMenuItem key={item.path}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          tooltip={state === "collapsed" ? item.name : undefined}
+                          className={`
+                            relative transition-all duration-200 hover:scale-[1.02]
+                            ${isActive ? 'bg-primary/10 text-primary shadow-sm' : ''}
+                          `}
+                        >
+                          <Link to={item.path} className="flex items-center gap-3 w-full">
+                            <item.icon className={`h-4 w-4 ${isActive ? 'text-primary animate-pulse' : ''}`} />
+                            <span className={isActive ? 'font-medium' : ''}>{item.name}</span>
+                            {isActive && (
+                              <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-r-full animate-fade-in"></div>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -135,18 +165,10 @@ const AppSidebar = () => {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link to="/projects/new">
-                        <Folder className="h-4 w-4" />
+                    <SidebarMenuButton asChild className="hover:scale-[1.02] transition-all duration-200">
+                      <Link to="/projects/new" className="flex items-center gap-3">
+                        <Plus className="h-4 w-4" />
                         <span>New Project</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link to="/vulndb">
-                        <Shield className="h-4 w-4" />
-                        <span>Search Vulnerabilities</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -157,9 +179,9 @@ const AppSidebar = () => {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t">
-        <div className="p-2">
-          <SidebarTrigger className="w-full" />
+      <SidebarFooter className="">
+        <div className="p-1">
+          <SidebarTrigger className="w-full hover:scale-[1.02] transition-all duration-200" />
         </div>
       </SidebarFooter>
     </Sidebar>

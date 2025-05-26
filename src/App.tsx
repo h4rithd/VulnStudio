@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Projects from './pages/Projects';
+import Reports from './pages/Reports';
 import NotFound from './pages/NotFound';
 import NewProject from './pages/NewProject';
 import EditProject from './pages/EditProject';
@@ -36,6 +37,9 @@ function App() {
               <Route path="/projects/new" element={<NewProject />} />
               <Route path="/projects/:projectId" element={<ProjectDetails />} />
               <Route path="/projects/:projectId/edit" element={<EditProject />} />
+              
+              {/* Reports Route */}
+              <Route path="/reports" element={<Reports />} />
               
               {/* Vulnerability Routes */}
               <Route path="/projects/:projectId/vulnerabilities/new" element={<AddVulnerability />} />

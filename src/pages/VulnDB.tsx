@@ -7,7 +7,7 @@ import { VulnDB as VulnDBType } from '@/types/database.types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash2, X, Eye, ArrowUpRight, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Eye, Package2, MoreHorizontal, Bug, Terminal, Cog, ShieldCheck, Microscope, Link } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -55,7 +55,6 @@ const VulnDB = () => {
 
   const fetchVulnerabilities = async () => {
     try {
-      console.log('[VulnDB] Fetching vulnerability templates from database');
       setLoading(true);
       const { data, error } = await supabase
         .from('vulndb')
@@ -63,14 +62,11 @@ const VulnDB = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[VulnDB] Error fetching vulnerabilities:', error);
         throw error;
       }
 
-      console.log('[VulnDB] Successfully loaded', data?.length, 'templates');
       setVulnerabilities(data || []);
     } catch (error: any) {
-      console.error('[VulnDB] Failed to fetch vulnerability templates:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to fetch vulnerability templates',
@@ -81,35 +77,28 @@ const VulnDB = () => {
     }
   };
 
-  const handleDeleteVulnerability = async (id: string) => {
-    console.log('[VulnDB] Attempting to delete vulnerability template:', id);
-    
+  const handleDeleteVulnerability = async (id: string) => {    
     if (!confirm('Are you sure you want to delete this template?')) {
-      console.log('[VulnDB] Delete canceled by user');
       return;
     }
 
     try {
-      console.log('[VulnDB] Deleting vulnerability template from database');
       const { error } = await supabase
         .from('vulndb')
         .delete()
         .eq('id', id);
 
       if (error) {
-        console.error('[VulnDB] Error deleting vulnerability:', error);
         throw error;
       }
 
       // Update the UI
-      console.log('[VulnDB] Template deleted successfully, updating UI');
       setVulnerabilities(vulnerabilities.filter(vuln => vuln.id !== id));
       toast({
         title: 'Success',
         description: 'Vulnerability template deleted successfully',
       });
     } catch (error: any) {
-      console.error('[VulnDB] Failed to delete vulnerability template:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete vulnerability template',
@@ -133,7 +122,6 @@ const VulnDB = () => {
   const handleAddRefLink = () => {
     const refLink = document.getElementById('ref_link') as HTMLInputElement;
     if (refLink.value.trim()) {
-      console.log('[VulnDB] Adding ref link:', refLink.value);
       setNewVulnerability({
         ...newVulnerability,
         ref_links: [...newVulnerability.ref_links, refLink.value.trim()]
@@ -143,7 +131,6 @@ const VulnDB = () => {
   };
 
   const handleRemoveRefLink = (index: number) => {
-    console.log('[VulnDB] Removing ref link at index:', index);
     const updatedLinks = [...newVulnerability.ref_links];
     updatedLinks.splice(index, 1);
     setNewVulnerability({
@@ -154,10 +141,8 @@ const VulnDB = () => {
 
   const handleAddVulnerability = async (e: FormEvent) => {
     e.preventDefault();
-    console.log('[VulnDB] Adding new vulnerability template:', newVulnerability.title);
     
     if (!user) {
-      console.error('[VulnDB] User not logged in');
       toast({
         title: 'Error',
         description: 'You must be logged in to add a vulnerability template',
@@ -170,7 +155,6 @@ const VulnDB = () => {
       // Validate form
       if (!newVulnerability.title || !newVulnerability.background || 
           !newVulnerability.details || !newVulnerability.remediation) {
-        console.error('[VulnDB] Form validation failed - missing required fields');
         toast({
           title: 'Error',
           description: 'Please fill in all required fields',
@@ -179,7 +163,6 @@ const VulnDB = () => {
         return;
       }
       
-      console.log('[VulnDB] Saving new template to database');
       const { data, error } = await supabase
         .from('vulndb')
         .insert({
@@ -193,13 +176,11 @@ const VulnDB = () => {
         .select();
       
       if (error) {
-        console.error('[VulnDB] Error adding template:', error);
         throw error;
       }
       
       // Add the new vulnerability to the state
       if (data) {
-        console.log('[VulnDB] Template added successfully, updating UI');
         setVulnerabilities([data[0], ...vulnerabilities]);
       }
       
@@ -212,7 +193,6 @@ const VulnDB = () => {
         description: 'Vulnerability template added successfully',
       });
     } catch (error: any) {
-      console.error('[VulnDB] Failed to add vulnerability template:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to add vulnerability template',
@@ -225,17 +205,14 @@ const VulnDB = () => {
     e.preventDefault();
     
     if (!user || !currentVuln) {
-      console.error('[VulnDB] Missing user or current vulnerability data');
       return;
     }
     
-    console.log('[VulnDB] Updating vulnerability template:', currentVuln.id);
     
     try {
       // Validate form
       if (!newVulnerability.title || !newVulnerability.background || 
           !newVulnerability.details || !newVulnerability.remediation) {
-        console.error('[VulnDB] Form validation failed - missing required fields');
         toast({
           title: 'Error',
           description: 'Please fill in all required fields',
@@ -244,7 +221,6 @@ const VulnDB = () => {
         return;
       }
       
-      console.log('[VulnDB] Sending update to database');
       const { error } = await supabase
         .from('vulndb')
         .update({
@@ -257,12 +233,10 @@ const VulnDB = () => {
         .eq('id', currentVuln.id);
       
       if (error) {
-        console.error('[VulnDB] Error updating template:', error);
         throw error;
       }
       
       // Update the vulnerability in the state
-      console.log('[VulnDB] Template updated successfully, updating UI');
       setVulnerabilities(vulnerabilities.map(vuln => 
         vuln.id === currentVuln.id 
           ? { 
@@ -285,7 +259,6 @@ const VulnDB = () => {
         description: 'Vulnerability template updated successfully',
       });
     } catch (error: any) {
-      console.error('[VulnDB] Failed to update vulnerability template:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update vulnerability template',
@@ -295,7 +268,6 @@ const VulnDB = () => {
   };
 
   const resetForm = () => {
-    console.log('[VulnDB] Resetting form');
     setNewVulnerability({
       title: '',
       background: '',
@@ -326,7 +298,7 @@ const VulnDB = () => {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Vulnerability Name</Label>
+              <Label htmlFor="title">Vulnerability Title</Label>
               <Input 
                 id="title" 
                 value={newVulnerability.title} 
@@ -336,7 +308,7 @@ const VulnDB = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="background">Issue Background</Label>
+              <Label htmlFor="background">Overview</Label>
               <Textarea 
                 id="background" 
                 value={newVulnerability.background} 
@@ -348,7 +320,7 @@ const VulnDB = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="details">Issue Detail</Label>
+              <Label htmlFor="details">Technical Analysis</Label>
               <Textarea 
                 id="details" 
                 value={newVulnerability.details} 
@@ -360,7 +332,7 @@ const VulnDB = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="remediation">Remediation</Label>
+              <Label htmlFor="remediation">Remediation Guidance</Label>
               <Textarea 
                 id="remediation" 
                 value={newVulnerability.remediation} 
@@ -435,7 +407,10 @@ const VulnDB = () => {
     <MainLayout>
       <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">VulnDB</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Package2 className="h-10 w-10" />
+            VulnDB
+            </h1>
           <p className="text-muted-foreground">Manage your vulnerability templates</p>
         </div>
         {isAdmin && (
@@ -473,7 +448,7 @@ const VulnDB = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50%]">Vulnerability Name</TableHead>
+                <TableHead className="w-[50%]">Vulnerability Title</TableHead>
                 <TableHead className="w-[20%] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -569,7 +544,10 @@ const VulnDB = () => {
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between">
-                  <DialogTitle>{currentVuln.title}</DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <Terminal className="h-7 w-7" />
+                  <DialogTitle className="text-2xl font-semibold">{currentVuln.title}</DialogTitle>
+                  </div>
                   <div className="flex gap-2">
                     {isAdmin && (
                       <Button variant="outline" size="sm" onClick={() => {
@@ -586,23 +564,35 @@ const VulnDB = () => {
               
               <div className="space-y-6 py-4">
                 <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">Issue Background</h3>
+                  <div className="flex items-center gap-1">
+                  <Cog className="h-4 w-4" />
+                    <h3 className="text-lg font-semibold">Overview</h3>
+                  </div>
                   <div className="text-sm whitespace-pre-wrap">{currentVuln.background}</div>
                 </div>
                 
                 <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">Issue Detail</h3>
+                  <div className="flex items-center gap-1">
+                  <Microscope className="h-4 w-4" />
+                    <h3 className="text-lg font-semibold">Technical Analysis</h3>
+                  </div>
                   <div className="text-sm whitespace-pre-wrap">{currentVuln.details}</div>
                 </div>
                 
                 <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">Remediation</h3>
+                  <div className="flex items-center gap-1">
+                    <ShieldCheck className="h-4 w-4" />
+                    <h3 className="text-lg font-semibold">Remediation Guidance</h3>
+                  </div>
                   <div className="text-sm whitespace-pre-wrap">{currentVuln.remediation}</div>
                 </div>
                 
                 {Array.isArray(currentVuln.ref_links) && currentVuln.ref_links.length > 0 && (
                   <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Related Links</h3>
+                    <div className="flex items-center gap-1">
+                      <Link className="h-4 w-4" />
+                      <h3 className="text-lg font-semibold">Related Links</h3>
+                    </div>
                     <ul className="list-disc pl-5">
                       {currentVuln.ref_links.map((link, i) => (
                         <li key={i} className="text-sm">

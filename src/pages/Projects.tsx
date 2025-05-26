@@ -17,7 +17,8 @@ import {
   RefreshCcw,
   Search,
   Archive,
-  AlertTriangle
+  AlertTriangle,
+  AppWindow
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
@@ -552,7 +553,7 @@ const Projects = () => {
               <TableHead>Project Title</TableHead>
               <TableHead className="w-auto">Vulnerabilities</TableHead>
               <TableHead className="w-[100px] text-center">Version</TableHead>
-              <TableHead className="w-[180px]">Date Range</TableHead>
+              <TableHead className="w-[200px] text-center">Date Range</TableHead>
               <TableHead className="w-[100px] text-center">Status</TableHead>
               <TableHead className="w-[60px] text-right">Actions</TableHead>
             </TableRow>
@@ -566,17 +567,17 @@ const Projects = () => {
                       {project.title}
                     </Link>
                     {project.is_retest && (
-                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-none">
+                      <Badge variant="outline" className="bg-[#12685E]/10 text-[#12685E] border-none">
                         Re-test
                       </Badge>
                     )}
                     {!project.is_retest && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-none">
+                      <Badge variant="outline" className="bg-[#62711E]/10 text-[#62711E] border-none">
                         Initial Assessment
                       </Badge>
                     )}
                     {project.isTemporary && (
-                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-none">
+                      <Badge variant="outline" className="bg-[#9B2808]/10 text-[#9B2808] border-none animate-pulse">
                         Temporary
                       </Badge>
                     )}
@@ -588,7 +589,7 @@ const Projects = () => {
                 <TableCell className="text-center">
                   {project.version}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   {new Date(project.start_date).toLocaleDateString()} - {new Date(project.end_date).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-center">
@@ -711,7 +712,10 @@ const Projects = () => {
     <MainLayout>
       <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <AppWindow className="h-10 w-10" />
+            Projects
+            </h1>
           <p className="text-muted-foreground">Manage your security testing projects</p>
         </div>
         {isAdmin && (
@@ -728,7 +732,7 @@ const Projects = () => {
       </div>
 
       {tempProjects.length > 0 && (
-        <Alert className="mb-6 bg-amber-50 border-amber-200 text-amber-800">
+        <Alert className="mb-6 bg-[#9B2808]/10 border-[#9B2808]/20 text-[#9B2808]">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Temporary Projects Warning</AlertTitle>
           <AlertDescription>
