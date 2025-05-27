@@ -71,7 +71,7 @@ const AppSidebar = () => {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
+    <Sidebar collapsible="icon" className="">
       <SidebarHeader className="border-b">
         <div className="flex items-center gap-2 px-2 py-2">
           {state === "expanded" && (
