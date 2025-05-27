@@ -11,11 +11,11 @@ import {
   Trash2,
   Eye,
   CheckCircle2,
-  Download,
+  CloudDownload,
   Copy,
   RefreshCcw,
   Search,
-  Archive,
+  FileArchive,
   AlertTriangle,
   AppWindow,
   ArrowUp,
@@ -710,7 +710,7 @@ const Projects = () => {
                         onClick={() => handleExportProject(project.id, project.title)}
                         className="cursor-pointer flex items-center"
                       >
-                        <Archive className="mr-2 h-4 w-4" />
+                        <FileArchive className="mr-2 h-4 w-4" />
                         <span>Export Report</span>
                       </DropdownMenuItem>
                       {!project.isTemporary && (
@@ -718,7 +718,7 @@ const Projects = () => {
                           onClick={() => handleDownload(project.id, 'pdf')}
                           className="cursor-pointer flex items-center"
                         >
-                          <Download className="mr-2 h-4 w-4" />
+                          <CloudDownload className="mr-2 h-4 w-4" />
                           <span>Download Report</span>
                         </DropdownMenuItem>
                       )}

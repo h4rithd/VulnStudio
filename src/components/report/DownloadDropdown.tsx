@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FileDown, FileText, FileCode, ChevronDown, Download, FileType, Archive, FileJson } from 'lucide-react';
+import { FileDown, FileText, FileCode, ChevronDown, Download, FileType, FileArchive, FileJson } from 'lucide-react';
 
 interface DownloadDropdownProps {
   onDownload: (format: 'html' | 'markdown' | 'pdf' | 'word' | 'zip' | 'json') => void;
@@ -21,7 +21,7 @@ export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({ onDownload }
         className="flex gap-1"
         variant="outline"
       >
-        <Archive className="h-4 w-4" /> 
+        <FileArchive className="h-4 w-4" /> 
         Export Project
       </Button>
       <Button 

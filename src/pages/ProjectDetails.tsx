@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { ChevronDown, ChevronLeft, FileText, PenLine, Plus, Shield, Trash2, Archive, BarChart3, Hammer } from 'lucide-react';
+import { ChevronDown, ChevronLeft, FileText, PenLine, Plus, Shield, Trash2, FileArchive, BarChart3, Hammer, FolderKanban, Bug } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -578,13 +578,15 @@ const ProjectDetails = () => {
           </Button>
           <Button variant="outline" size="sm"
             onClick={() => handleExportProject(projectData.id, projectData.title)}>
-            <Archive className="mr-2 h-4 w-4" />
+            <FileArchive className="mr-2 h-4 w-4" />
             <span>Export Report</span>
           </Button>
         </div>
       </div>
 
-      <h1 className="text-3xl font-bold mb-2">{projectData.title}</h1>
+      <h1 className="text-3xl font-bold mb-4 flex">
+        <FolderKanban className="mr-2 h-9 w-9" />
+        {projectData.title}</h1>
       
       {/* Project summary section with stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -730,7 +732,8 @@ const ProjectDetails = () => {
       <Tabs defaultValue="vulnerabilities" className="w-full" onValueChange={setActiveTab}>
         <TabsContent value="vulnerabilities" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold">Vulnerabilities</h2>
+            <h2 className="text-2xl font-semibold">
+              Vulnerabilities</h2>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleGenerateAllIds}>
                 <Hammer className="h-4 w-4 mr-1" />
