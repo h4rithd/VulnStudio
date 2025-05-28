@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle } from 'lucide-react';
+import { edgeFunctionsApi } from '@/utils/api';
 
 const adminSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -43,23 +43,14 @@ export const AdminSetupForm = ({ onAdminCreated }: AdminSetupFormProps) => {
     setIsLoading(true);
     try {
       // Call the edge function to create the default admin
-      const response = await fetch(`https://dzqaszkmmxafenqujsyv.supabase.co/functions/v1/create-admin-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cWFzemttbXhhZmVucXVqc3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQ0ODEsImV4cCI6MjA2MjEzMDQ4MX0.rjqJXrI4JK3Hbqs4XiIun69DCp50WJMrTQN8dBwB0qE`,
-        },
-        body: JSON.stringify({
-          email: 'admin@vulnstudio.com',
-          password: 'password1234',
-          name: 'System Administrator',
-          role: 'admin',
-        }),
+      const result = await edgeFunctionsApi.createAdminUser({
+        email: 'admin@vulnstudio.com',
+        password: 'password1234',
+        name: 'System Administrator',
+        role: 'admin'
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         console.error('Default admin creation error:', result.error);
         // Continue anyway as this might be a duplicate user error
       }
@@ -84,23 +75,14 @@ export const AdminSetupForm = ({ onAdminCreated }: AdminSetupFormProps) => {
     setIsLoading(true);
     try {
       // Call the edge function to create custom admin
-      const response = await fetch(`https://dzqaszkmmxafenqujsyv.supabase.co/functions/v1/create-admin-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cWFzemttbXhhZmVucXVqc3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQ0ODEsImV4cCI6MjA2MjEzMDQ4MX0.rjqJXrI4JK3Hbqs4XiIun69DCp50WJMrTQN8dBwB0qE`,
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          name: data.name,
-          role: 'admin',
-        }),
+      const result = await edgeFunctionsApi.createAdminUser({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+        role: 'admin'
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         console.error('Custom admin creation error:', result.error);
         // Continue anyway as this might be a duplicate user error
       }

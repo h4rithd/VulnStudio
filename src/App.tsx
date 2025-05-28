@@ -1,7 +1,7 @@
-
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Index from './pages/Index';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -19,48 +19,52 @@ import ReportView from './pages/ReportView';
 import { Toaster } from './components/ui/toaster';
 import ProtectedRoute from './components/layouts/ProtectedRoute';
 
+const queryClient = new QueryClient();
+
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/projects/new" element={<NewProject />} />
-              <Route path="/projects/:projectId" element={<ProjectDetails />} />
-              <Route path="/projects/:projectId/edit" element={<EditProject />} />
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
               
-              {/* Reports Route */}
-              <Route path="/reports" element={<Reports />} />
+              {/* Protected Routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/new" element={<NewProject />} />
+                <Route path="/projects/:projectId" element={<ProjectDetails />} />
+                <Route path="/projects/:projectId/edit" element={<EditProject />} />
+                
+                {/* Reports Route */}
+                <Route path="/reports" element={<Reports />} />
+                
+                {/* Vulnerability Routes */}
+                <Route path="/projects/:projectId/vulnerabilities/new" element={<AddVulnerability />} />
+                <Route path="/projects/:projectId/vulnerabilities/:vulnId" element={<AddVulnerability />} />
+                <Route path="/projects/:projectId/vulnerabilities/:vulnId/edit" element={<AddVulnerability />} />
+                
+                {/* Report Route */}
+                <Route path="/projects/:projectId/report" element={<ReportView />} />
+                
+                {/* VulnDB Route */}
+                <Route path="/vulndb" element={<VulnDB />} />
+              </Route>
               
-              {/* Vulnerability Routes */}
-              <Route path="/projects/:projectId/vulnerabilities/new" element={<AddVulnerability />} />
-              <Route path="/projects/:projectId/vulnerabilities/:vulnId" element={<AddVulnerability />} />
-              <Route path="/projects/:projectId/vulnerabilities/:vulnId/edit" element={<AddVulnerability />} />
-              
-              {/* Report Route */}
-              <Route path="/projects/:projectId/report" element={<ReportView />} />
-              
-              {/* VulnDB Route */}
-              <Route path="/vulndb" element={<VulnDB />} />
-            </Route>
-            
-            {/* Not Found */}
-            <Route path="/404" element={<NotFound />} />
-            <Route path="*" element={<Navigate to="/404" replace />} />
-          </Routes>
-        </Router>
-        <Toaster />
-      </AuthProvider>
-    </ThemeProvider>
+              {/* Not Found */}
+              <Route path="/404" element={<NotFound />} />
+              <Route path="*" element={<Navigate to="/404\" replace />} />
+            </Routes>
+          </Router>
+          <Toaster />
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

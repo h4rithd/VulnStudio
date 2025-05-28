@@ -5,12 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Plus, FileEdit, RotateCcw, Clock, CheckCircle, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
+import { reportsApi, vulnerabilitiesApi } from '@/utils/api';
 
 interface RecentProject extends Reports {
+  id: string | number; // Add this line if Reports does not already include 'id'
+  title: string; // Add this line to fix the error
+  created_at?: string | Date; // Add this line to fix the error
   vulnerabilities_count?: {
     total: number;
     critical: number;
@@ -105,95 +108,26 @@ const Dashboard = () => {
         setLoading(true);
         
         // Fetch recent projects
-        const { data: projects, error: projectsError } = await supabase
-          .from('reports')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(5);
+        const projectsResult = await reportsApi.getAll();
         
-        if (projectsError) throw projectsError;
-        
-        if (projects) {
-          const projectsWithVulnCounts: RecentProject[] = await Promise.all(
-            projects.map(async (project) => {
-              // Get vulnerability counts for each project
-              const { data: vulnData, error: vulnError } = await supabase
-                .from('vulnerabilities')
-                .select('severity')
-                .eq('report_id', project.id);
-
-              if (vulnError) {
-                console.error("Error fetching vulnerabilities:", vulnError);
-                return {
-                  ...project,
-                  vulnerabilities_count: {
-                    total: 0,
-                    critical: 0,
-                    high: 0,
-                    medium: 0,
-                    low: 0,
-                    info: 0,
-                  },
-                };
-              }
-
-              const vulnCounts = {
-                total: vulnData?.length || 0,
-                critical: vulnData?.filter(v => v.severity === 'critical').length || 0,
-                high: vulnData?.filter(v => v.severity === 'high').length || 0,
-                medium: vulnData?.filter(v => v.severity === 'medium').length || 0,
-                low: vulnData?.filter(v => v.severity === 'low').length || 0,
-                info: vulnData?.filter(v => v.severity === 'info').length || 0,
-              };
-
-              return {
-                ...project,
-                vulnerabilities_count: vulnCounts,
-              };
-            })
-          );
-          
-          setRecentProjects(projectsWithVulnCounts);
+        if (!projectsResult.success) {
+          throw new Error(projectsResult.error || 'Failed to fetch projects');
         }
+        
+        // Get the 5 most recent projects
+        const recentProjectsData = projectsResult.data?.slice(0, 5) || [];
+        setRecentProjects(recentProjectsData);
 
-        // Fetch total projects count
-        const { count: totalCount, error: totalError } = await supabase
-          .from('reports')
-          .select('*', { count: 'exact', head: true });
+        // Get project counts
+        const totalProjects = projectsResult.data?.length || 0;
+        const completedProjects = projectsResult.data?.filter(p => p.status === 'completed').length || 0;
+        const draftProjects = projectsResult.data?.filter(p => p.status === 'draft').length || 0;
+        const inProgressProjects = projectsResult.data?.filter(p => p.status === 'review').length || 0;
         
-        if (totalError) throw totalError;
-
-        // Fetch completed projects count
-        const { count: completedCount, error: completedError } = await supabase
-          .from('reports')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'completed');
+        setPendingDrafts(draftProjects);
+        setRetestProjects(inProgressProjects);
         
-        if (completedError) throw completedError;
-
-        // Fetch pending drafts count
-        const { count: draftCount, error: draftError } = await supabase
-          .from('reports')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'draft');
-        
-        if (draftError) throw draftError;
-
-        // Fetch retest projects count (using in-progress as retest indicator)
-        const { count: retestCount, error: retestError } = await supabase
-          .from('reports')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'in-progress');
-        
-        if (retestError) throw retestError;
-        
-        // Fetch vulnerability counts by severity
-        const { data: vulnData, error: vulnError } = await supabase
-          .from('vulnerabilities')
-          .select('severity');
-        
-        if (vulnError) throw vulnError;
-
+        // Calculate vulnerability counts
         const vulnerabilityCounts = {
           critical: 0,
           high: 0,
@@ -201,24 +135,24 @@ const Dashboard = () => {
           low: 0,
           info: 0,
         };
-
-        if (vulnData) {
-          vulnData.forEach(vuln => {
-            if (vulnerabilityCounts[vuln.severity as keyof typeof vulnerabilityCounts] !== undefined) {
-              vulnerabilityCounts[vuln.severity as keyof typeof vulnerabilityCounts]++;
-            }
-          });
-        }
+        
+        // Sum up all vulnerabilities from all projects
+        projectsResult.data?.forEach(project => {
+          if (project.vulnerabilities_count) {
+            vulnerabilityCounts.critical += project.vulnerabilities_count.critical;
+            vulnerabilityCounts.high += project.vulnerabilities_count.high;
+            vulnerabilityCounts.medium += project.vulnerabilities_count.medium;
+            vulnerabilityCounts.low += project.vulnerabilities_count.low;
+            vulnerabilityCounts.info += project.vulnerabilities_count.info;
+          }
+        });
 
         // Generate monthly activity data
-        const monthlyActivity = generateMonthlyActivity(projects || []);
-        
-        setPendingDrafts(draftCount || 0);
-        setRetestProjects(retestCount || 0);
+        const monthlyActivity = generateMonthlyActivity(projectsResult.data || []);
         
         setStats({
-          totalProjects: totalCount || 0,
-          completedProjects: completedCount || 0,
+          totalProjects,
+          completedProjects,
           vulnerabilities: vulnerabilityCounts,
           monthlyActivity,
         });

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -29,11 +28,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { ChevronDown, ChevronLeft, FileText, PenLine, Plus, Shield, Trash2, FileArchive, BarChart3, Hammer, FolderKanban, Bug } from 'lucide-react';
+import { ChevronDown, ChevronLeft, FileText, PenLine, Plus, Shield, Trash2, Archive, BarChart3, Hammer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { Vulnerability } from '@/components/vulnerability/types/vulnerability.types';
+import { reportsApi, vulnerabilitiesApi } from '@/utils/api';
 
 // Define severity order for sorting
 const SEVERITY_ORDER = {
@@ -115,25 +114,33 @@ const ProjectDetails = () => {
             throw new Error('No temporary projects found');
           }
         } else {
-          // Load from Supabase
-          const { data, error } = await supabase
-            .from('reports')
-            .select('*')
-            .eq('id', projectId)
-            .single();
-
-          if (error) throw error;
-          setProjectData(data);
+          // Load from API
+          const projectResult = await reportsApi.getById(projectId);
+          if (!projectResult.success) {
+            throw new Error(projectResult.error || 'Failed to load project data');
+          }
+          setProjectData(projectResult.data);
 
           // Fetch vulnerabilities for this project
-          const { data: vulnData, error: vulnError } = await supabase
-            .from('vulnerabilities')
-            .select('*')
-            .eq('report_id', projectId)
-            .order('display_order', { ascending: false });
-
-          if (vulnError) throw vulnError;
-          setVulnerabilities(vulnData || []);
+          const vulnResult = await vulnerabilitiesApi.getByReportId(projectId);
+          if (!vulnResult.success) {
+            throw new Error(vulnResult.error || 'Failed to load vulnerabilities');
+          }
+          setVulnerabilities(
+            (vulnResult.data || []).map((vuln: any) => ({
+              ...vuln,
+              affected_versions: Array.isArray(vuln.affected_versions)
+                ? vuln.affected_versions
+                : typeof vuln.affected_versions === 'string'
+                  ? (() => { try { return JSON.parse(vuln.affected_versions); } catch { return []; } })()
+                  : [],
+              ref_links: Array.isArray(vuln.ref_links)
+                ? vuln.ref_links
+                : typeof vuln.ref_links === 'string'
+                  ? (() => { try { return JSON.parse(vuln.ref_links); } catch { return []; } })()
+                  : [],
+            }))
+          );
         }
       } catch (error: any) {
         console.error('Error loading project data:', error);
@@ -221,16 +228,13 @@ const ProjectDetails = () => {
       // Save updated vulnerabilities to localStorage
       localStorage.setItem(`vulns_${projectId}`, JSON.stringify(updatedVulns));
     } else {
-      // For cloud projects, update in Supabase
+      // For cloud projects, update in database
       for (const vulnId in updatedIds) {
         const newVulnId = updatedIds[vulnId];
         const vuln = updatedVulns.find(v => v.id === vulnId);
 
         if (vuln && vuln.vulnerability_id !== newVulnId) {
-          await supabase
-            .from('vulnerabilities')
-            .update({ vulnerability_id: newVulnId })
-            .eq('id', vulnId);
+          await vulnerabilitiesApi.update(vulnId, { vulnerability_id: newVulnId });
 
           // Update local state as well
           const vulnIndex = updatedVulns.findIndex(v => v.id === vulnId);
@@ -272,12 +276,9 @@ const ProjectDetails = () => {
         // For temporary projects, update in localStorage
         localStorage.setItem(`vulns_${projectId}`, JSON.stringify(updatedItems));
       } else {
-        // For cloud projects, update in Supabase
+        // For cloud projects, update in database
         const updatePromises = updatedItems.map(item =>
-          supabase
-            .from('vulnerabilities')
-            .update({ display_order: item.display_order })
-            .eq('id', item.id)
+          vulnerabilitiesApi.update(item.id, { display_order: item.display_order })
         );
         
         await Promise.all(updatePromises);
@@ -321,24 +322,11 @@ const ProjectDetails = () => {
           setVulnerabilities(updatedVulns);
         }
       } else {
-        // First delete any attachments related to this vulnerability
-        const { error: attachmentError } = await supabase
-          .from('attachments')
-          .delete()
-          .eq('vulnerability_id', deleteVulnId);
-
-        if (attachmentError) {
-          console.error("Error deleting attachments:", attachmentError);
-          throw attachmentError;
+        // Delete the vulnerability using the API
+        const result = await vulnerabilitiesApi.delete(deleteVulnId);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to delete vulnerability');
         }
-
-        // Then delete the vulnerability
-        const { error } = await supabase
-          .from('vulnerabilities')
-          .delete()
-          .eq('id', deleteVulnId);
-
-        if (error) throw error;
 
         // Remove from state
         setVulnerabilities(prev => prev.filter(v => v.id !== deleteVulnId));
@@ -384,17 +372,16 @@ const ProjectDetails = () => {
           setVulnerabilities(updatedVulns);
         }
       } else {
-        // Update the status in the database
-        const { error } = await supabase
-          .from('vulnerabilities')
-          .update({
-            current_status: newStatus,
-            // If marking as resolved for the first time, set the retest_date to today
-            ...(newStatus && !vuln.retest_date ? { retest_date: new Date().toISOString() } : {})
-          })
-          .eq('id', vuln.id);
+        // Update the status using the API
+        const result = await vulnerabilitiesApi.update(vuln.id, {
+          current_status: newStatus,
+          // If marking as resolved for the first time, set the retest_date to today
+          ...(newStatus && !vuln.retest_date ? { retest_date: new Date().toISOString() } : {})
+        });
 
-        if (error) throw error;
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update vulnerability status');
+        }
 
         // Update in state
         setVulnerabilities(prev =>
@@ -578,15 +565,13 @@ const ProjectDetails = () => {
           </Button>
           <Button variant="outline" size="sm"
             onClick={() => handleExportProject(projectData.id, projectData.title)}>
-            <FileArchive className="mr-2 h-4 w-4" />
+            <Archive className="mr-2 h-4 w-4" />
             <span>Export Report</span>
           </Button>
         </div>
       </div>
 
-      <h1 className="text-3xl font-bold mb-4 flex">
-        <FolderKanban className="mr-2 h-9 w-9" />
-        {projectData.title}</h1>
+      <h1 className="text-3xl font-bold mb-2">{projectData.title}</h1>
       
       {/* Project summary section with stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -675,7 +660,7 @@ const ProjectDetails = () => {
                 <div className="flex flex-col justify-center">
                   {totalVulnerabilities > 0 ? (
                     <div className="h-48">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%\" height="100%">
                         <PieChart>
                           <Pie
                             data={[
@@ -732,8 +717,7 @@ const ProjectDetails = () => {
       <Tabs defaultValue="vulnerabilities" className="w-full" onValueChange={setActiveTab}>
         <TabsContent value="vulnerabilities" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold">
-              Vulnerabilities</h2>
+            <h2 className="text-2xl font-semibold">Vulnerabilities</h2>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleGenerateAllIds}>
                 <Hammer className="h-4 w-4 mr-1" />

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { formatRequestResponse } from '@/components/vulnerability/utils/search-utils';
 import { Vulnerability } from '@/components/vulnerability/types/vulnerability.types';

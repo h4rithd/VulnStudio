@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import MainLayout from '@/components/layouts/MainLayout';
-import { supabase } from '@/lib/supabase';
 import { VulnDB as VulnDBType } from '@/types/database.types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
+import { vulnDbApi } from '@/utils/api';
 
 const VulnDB = () => {
   const [vulnerabilities, setVulnerabilities] = useState<VulnDBType[]>([]);
@@ -56,16 +56,13 @@ const VulnDB = () => {
   const fetchVulnerabilities = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('vulndb')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
+      const result = await vulnDbApi.getAll();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch vulnerability templates');
       }
-
-      setVulnerabilities(data || []);
+      
+      setVulnerabilities(result.data || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -83,13 +80,10 @@ const VulnDB = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('vulndb')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
+      const result = await vulnDbApi.delete(id);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete vulnerability template');
       }
 
       // Update the UI
@@ -163,25 +157,21 @@ const VulnDB = () => {
         return;
       }
       
-      const { data, error } = await supabase
-        .from('vulndb')
-        .insert({
-          title: newVulnerability.title,
-          background: newVulnerability.background,
-          details: newVulnerability.details,
-          remediation: newVulnerability.remediation,
-          ref_links: newVulnerability.ref_links,
-          created_by: user.id
-        })
-        .select();
+      const result = await vulnDbApi.create({
+        title: newVulnerability.title,
+        background: newVulnerability.background,
+        details: newVulnerability.details,
+        remediation: newVulnerability.remediation,
+        ref_links: newVulnerability.ref_links
+      });
       
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to add vulnerability template');
       }
       
       // Add the new vulnerability to the state
-      if (data) {
-        setVulnerabilities([data[0], ...vulnerabilities]);
+      if (result.data) {
+        setVulnerabilities([result.data, ...vulnerabilities]);
       }
       
       // Reset form and close dialog
@@ -208,7 +198,6 @@ const VulnDB = () => {
       return;
     }
     
-    
     try {
       // Validate form
       if (!newVulnerability.title || !newVulnerability.background || 
@@ -221,19 +210,16 @@ const VulnDB = () => {
         return;
       }
       
-      const { error } = await supabase
-        .from('vulndb')
-        .update({
-          title: newVulnerability.title,
-          background: newVulnerability.background,
-          details: newVulnerability.details,
-          remediation: newVulnerability.remediation,
-          ref_links: newVulnerability.ref_links
-        })
-        .eq('id', currentVuln.id);
+      const result = await vulnDbApi.update(currentVuln.id, {
+        title: newVulnerability.title,
+        background: newVulnerability.background,
+        details: newVulnerability.details,
+        remediation: newVulnerability.remediation,
+        ref_links: newVulnerability.ref_links
+      });
       
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update vulnerability template');
       }
       
       // Update the vulnerability in the state

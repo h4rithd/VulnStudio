@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Clock, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
+import { reportsApi } from '@/utils/api';
 
 interface ProjectSearchProps {
   className?: string;
@@ -58,15 +57,20 @@ const ProjectSearch: React.FC<ProjectSearchProps> = ({ className }) => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .or(`title.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%`)
-        .order('updated_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      setResults(data || []);
+      // Use the reportsApi to search for reports
+      const result = await reportsApi.getAll();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to search reports');
+      }
+      
+      // Filter reports based on search term
+      const filteredReports = result.data?.filter(report => 
+        report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        report.status.toLowerCase().includes(searchTerm.toLowerCase())
+      ) || [];
+      
+      setResults(filteredReports);
       setIsOpen(true);
     } catch (error) {
       console.error('Search error:', error);

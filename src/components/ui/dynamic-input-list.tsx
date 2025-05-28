@@ -21,7 +21,7 @@ export const DynamicInputList: React.FC<DynamicInputListProps> = ({
 }) => {
   const handleItemChange = (index: number, value: string) => {
     const updatedItems = [...items];
-    updatedItems[index].value = value;
+    updatedItems[index] = { value };
     onChange(updatedItems);
   };
 

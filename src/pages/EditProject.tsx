@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -13,9 +12,9 @@ import { CalendarIcon, ChevronLeft, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { reportsApi } from '@/utils/api';
 
 interface ProjectFormData {
   title: string;
@@ -53,21 +52,18 @@ const EditProject = () => {
       try {
         if (!projectId) return;
 
-        const { data, error } = await supabase
-          .from('reports')
-          .select('*')
-          .eq('id', projectId)
-          .single();
+        const result = await reportsApi.getById(projectId);
 
-        if (error) {
-          throw error;
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to load project');
         }
 
+        const data = result.data;
         if (data) {
           setValue('title', data.title);
           setValue('preparer', data.preparer);
           setValue('reviewer', data.reviewer);
-          setValue('version', data.version);
+          setValue('version', data.version || '');
           
           // Handle version_history (which might be null for older records)
           setValue('version_history', data.version_history || '');
@@ -129,23 +125,19 @@ const EditProject = () => {
         { type: 'domain', value: data.domain },
       ];
 
-      const { error } = await supabase
-        .from('reports')
-        .update({
-          title: updatedTitle,
-          preparer: data.preparer,
-          reviewer: data.reviewer,
-          version: data.version,
-          version_history: data.version_history || '',  // Ensure we never send null
-          start_date: formattedStartDate,
-          end_date: formattedEndDate,
-          scope,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', projectId);
+      const result = await reportsApi.update(projectId!, {
+        title: updatedTitle,
+        preparer: data.preparer,
+        reviewer: data.reviewer,
+        version: data.version,
+        version_history: data.version_history || '',  // Ensure we never send null
+        start_date: formattedStartDate,
+        end_date: formattedEndDate,
+        scope,
+      });
 
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update project');
       }
 
       toast({

@@ -23,11 +23,11 @@ const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full mx-3">
+      <div className="min-h-screen flex w-full">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1">
           <Navbar />
-          <main className="flex-1 p-4 md:p-6 overflow-auto">
+          <main className="flex-1 p-4 md:p-6 overflow-auto mx-3">
             {children}
           </main>
           <Footer />

@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -6,218 +7,261 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
-      users: {
+      attachments: {
         Row: {
           id: string
-          created_at: string
-          email: string
+          vulnerability_id: string
           name: string
-          role: 'admin' | 'auditor'
-          username: string
+          label: string
+          data: string
+          content_type: string
+          created_at: string | null
+          created_by: string
         }
         Insert: {
           id?: string
-          created_at?: string
-          email: string
+          vulnerability_id: string
           name: string
-          role?: 'admin' | 'auditor'
-          username: string
+          label?: string
+          data: string
+          content_type: string
+          created_at?: string | null
+          created_by: string
         }
         Update: {
           id?: string
-          created_at?: string
-          email?: string
+          vulnerability_id?: string
           name?: string
-          role?: 'admin' | 'auditor'
-          username?: string
+          label?: string
+          data?: string
+          content_type?: string
+          created_at?: string | null
+          created_by?: string
         }
       }
       reports: {
         Row: {
           id: string
-          created_at: string
-          updated_at: string
           title: string
+          created_at: string | null
+          updated_at: string | null
           start_date: string
           end_date: string
           preparer: string
           reviewer: string
+          preparer_email: string | null
+          reviewer_email: string | null
           scope: Json
           status: 'draft' | 'review' | 'completed' | 'archived'
-          version: string
-          version_history: string
+          version: string | null
+          version_history: string | null
           created_by: string
         }
         Insert: {
           id?: string
-          created_at?: string
-          updated_at?: string
           title: string
+          created_at?: string | null
+          updated_at?: string | null
           start_date: string
           end_date: string
           preparer: string
           reviewer: string
+          preparer_email?: string | null
+          reviewer_email?: string | null
           scope: Json
           status?: 'draft' | 'review' | 'completed' | 'archived'
-          version?: string
-          version_history?: string
+          version?: string | null
+          version_history?: string | null
           created_by: string
         }
         Update: {
           id?: string
-          created_at?: string
-          updated_at?: string
           title?: string
+          created_at?: string | null
+          updated_at?: string | null
           start_date?: string
           end_date?: string
           preparer?: string
           reviewer?: string
+          preparer_email?: string | null
+          reviewer_email?: string | null
           scope?: Json
           status?: 'draft' | 'review' | 'completed' | 'archived'
-          version?: string
-          version_history?: string
+          version?: string | null
+          version_history?: string | null
+          created_by?: string
+        }
+      }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      users: {
+        Row: {
+          id: string
+          name: string | null
+          email: string | null
+          username: string | null
+          first_login: boolean | null
+        }
+        Insert: {
+          id: string
+          name?: string | null
+          email?: string | null
+          username?: string | null
+          first_login?: boolean | null
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          email?: string | null
+          username?: string | null
+          first_login?: boolean | null
+        }
+      }
+      vulndb: {
+        Row: {
+          id: string
+          title: string
+          background: string
+          details: string
+          remediation: string
+          ref_links: Json | null
+          created_at: string | null
+          updated_at: string | null
+          created_by: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          background: string
+          details: string
+          remediation: string
+          ref_links?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+          created_by: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          background?: string
+          details?: string
+          remediation?: string
+          ref_links?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
           created_by?: string
         }
       }
       vulnerabilities: {
         Row: {
           id: string
-          created_at: string
-          updated_at: string
-          report_id: string
           title: string
-          description: string
-          severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
+          severity: string
           cvss_score: number
           cvss_vector: string
-          affected_versions: Json
           background: string
           details: string
           remediation: string
-          ref_links: Json
-          request_response: Json
+          ref_links: Json | null
+          affected_versions: Json | null
+          report_id: string
+          vulnerability_id: string | null
+          display_order: number | null
+          current_status: boolean | null
+          request_response: Json | null
+          poc_images: Json | null
+          retest_date: string | null
+          retest_result: string | null
+          retest_images: Json | null
+          created_at: string | null
+          updated_at: string | null
           created_by: string
-          poc_images: Json
-          display_order: number
         }
         Insert: {
           id?: string
-          created_at?: string
-          updated_at?: string
-          report_id: string
           title: string
-          description: string
-          severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
+          severity: string
           cvss_score: number
           cvss_vector: string
-          affected_versions?: Json
           background: string
           details: string
           remediation: string
-          ref_links?: Json
-          request_response?: Json
+          ref_links?: Json | null
+          affected_versions?: Json | null
+          report_id: string
+          vulnerability_id?: string | null
+          display_order?: number | null
+          current_status?: boolean | null
+          request_response?: Json | null
+          poc_images?: Json | null
+          retest_date?: string | null
+          retest_result?: string | null
+          retest_images?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
           created_by: string
-          poc_images?: Json
-          display_order?: number
         }
         Update: {
           id?: string
-          created_at?: string
-          updated_at?: string
-          report_id?: string
           title?: string
-          description?: string
-          severity?: 'critical' | 'high' | 'medium' | 'low' | 'info'
+          severity?: string
           cvss_score?: number
           cvss_vector?: string
-          affected_versions?: Json
           background?: string
           details?: string
           remediation?: string
-          ref_links?: Json
-          request_response?: Json
-          created_by?: string
-          poc_images?: Json
-          display_order?: number
-        }
-      }
-      vulnDB: {
-        Row: {
-          id: string
-          created_at: string
-          updated_at: string
-          title: string
-          background: string
-          details: string
-          remediation: string
-          ref_links: Json
-          created_by: string
-          category: string
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          updated_at?: string
-          title: string
-          background: string
-          details: string
-          remediation: string
-          ref_links?: Json
-          created_by: string
-          category: string
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          updated_at?: string
-          title?: string
-          background?: string
-          details?: string
-          remediation?: string
-          ref_links?: Json
-          created_by?: string
-          category?: string
-        }
-      }
-      attachments: {
-        Row: {
-          id: string
-          created_at: string
-          vulnerability_id: string
-          name: string
-          content_type: string
-          data: string
-          created_by: string
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          vulnerability_id: string
-          name: string
-          content_type: string
-          data: string
-          created_by: string
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          vulnerability_id?: string
-          name?: string
-          content_type?: string
-          data?: string
+          ref_links?: Json | null
+          affected_versions?: Json | null
+          report_id?: string
+          vulnerability_id?: string | null
+          display_order?: number | null
+          current_status?: boolean | null
+          request_response?: Json | null
+          poc_images?: Json | null
+          retest_date?: string | null
+          retest_result?: string | null
+          retest_images?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
           created_by?: string
         }
       }
     }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
-
-export type Tables = Database['public']['Tables']
-export type Users = Tables['users']['Row']
-export type Reports = Tables['reports']['Row']
-export type Vulnerabilities = Tables['vulnerabilities']['Row']
-export type VulnDB = Tables['vulnDB']['Row']
-export type Attachments = Tables['attachments']['Row']

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
@@ -6,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { exportProjectToZip } from '@/utils/projectExport';
 import { DownloadDropdown } from '@/components/report/DownloadDropdown';
@@ -14,10 +12,8 @@ import {
   Search,
   FileText,
   Calendar,
-  User,
   Eye,
   CloudDownload,
-  Download,
   Filter,
   LibraryBig,
   FileArchive,
@@ -39,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { reportsApi } from '@/utils/api';
 
 interface ProjectReport {
   id: string;
@@ -75,31 +72,18 @@ const Reports = () => {
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Get vulnerability counts for each report
-      const reportsWithCounts = await Promise.all((data || []).map(async (report) => {
-        const { data: vulnData, error: vulnError } = await supabase
-          .from('vulnerabilities')
-          .select('id')
-          .eq('report_id', report.id);
-
-        if (vulnError) {
-          console.error('Error fetching vulnerability count:', vulnError);
-          return { ...report, vulnerabilities_count: 0 };
-        }
-
-        return {
-          ...report,
-          vulnerabilities_count: vulnData?.length || 0
-        };
-      }));
-
+      const result = await reportsApi.getAll();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch reports');
+      }
+      
+      // Transform data to include vulnerability counts
+      const reportsWithCounts = result.data?.map(report => ({
+        ...report,
+        vulnerabilities_count: report.vulnerabilities_count.total
+      })) || [];
+      
       setReports(reportsWithCounts);
     } catch (error: any) {
       toast({

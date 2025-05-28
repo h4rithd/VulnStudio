@@ -1,12 +1,11 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { Import } from 'lucide-react';
 import JSZip from 'jszip';
+import { reportsApi, vulnerabilitiesApi } from '@/utils/api';
 
 const ProjectImportButton = () => {
   const [isImporting, setIsImporting] = useState(false);
@@ -67,48 +66,44 @@ const ProjectImportButton = () => {
         );
       }
       
-      // Create new project in database
-      const { data: project, error } = await supabase
-        .from('reports')
-        .insert({
-          title: projectJson.title,
-          start_date: projectJson.start_date,
-          end_date: projectJson.end_date,
-          preparer: projectJson.preparer,
-          reviewer: projectJson.reviewer,
-          version: projectJson.version,
-          version_history: projectJson.version_history || '',
-          scope: projectJson.scope,
-          status: projectJson.status || 'draft',
-          created_by: user.id
-        })
-        .select()
-        .single();
+      // Create new project in database using the API
+      const result = await reportsApi.create({
+        title: projectJson.title,
+        start_date: projectJson.start_date,
+        end_date: projectJson.end_date,
+        preparer: projectJson.preparer,
+        preparer_email: projectJson.preparer_email || '',
+        reviewer: projectJson.reviewer,
+        reviewer_email: projectJson.reviewer_email || '',
+        version: projectJson.version || '1.0',
+        version_history: projectJson.version_history || '',
+        scope: projectJson.scope || [],
+        status: projectJson.status || 'draft',
+      });
       
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create project');
       }
       
+      const project = result.data;
+      
       // If we have vulnerabilities, import them
-      if (processedVulnerabilities.length > 0) {
-        // Map vulnerabilities to the new project
-        const vulnerabilitiesToInsert = processedVulnerabilities.map((vuln: any) => {
-          // Strip old IDs and use the new project ID
-          const { id, ...vulnWithoutId } = vuln;
-          return {
-            ...vulnWithoutId,
-            report_id: project.id,
-            created_by: user.id
-          };
-        });
-        
-        // Insert all vulnerabilities
-        const { error: vulnError } = await supabase
-          .from('vulnerabilities')
-          .insert(vulnerabilitiesToInsert);
-        
-        if (vulnError) {
-          throw vulnError;
+      if (processedVulnerabilities.length > 0 && project) {
+        // Add each vulnerability one by one
+        for (const vuln of processedVulnerabilities) {
+          // Remove id and report_id from the vulnerability
+          const { id, report_id, ...vulnData } = vuln;
+          
+          // Create the vulnerability using the API
+          const vulnResult = await vulnerabilitiesApi.create({
+            ...vulnData,
+            report_id: project.id
+          });
+          
+          if (!vulnResult.success) {
+            console.error('Failed to import vulnerability:', vulnResult.error);
+            // Continue with other vulnerabilities even if one fails
+          }
         }
       }
       
@@ -119,7 +114,6 @@ const ProjectImportButton = () => {
       
       // Navigate to the new project
       navigate(`/projects/${project.id}`);
-      
     } catch (error: any) {
       console.error('Import error:', error);
       toast({

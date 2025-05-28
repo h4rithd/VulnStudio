@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +5,6 @@ import * as z from 'zod';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -19,6 +17,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { usersApi, authApi } from '@/utils/api';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -70,18 +69,15 @@ const Profile = () => {
     setProfileUpdateLoading(true);
     try {
       console.log('Updating user profile with data:', data);
-      // Update user in Supabase
-      const { error } = await supabase
-        .from('users')
-        .update({
-          name: data.name,
-          username: data.username,
-          email: data.email,
-        })
-        .eq('id', user.id);
+      
+      const result = await usersApi.update(user.id, {
+        name: data.name,
+        username: data.username,
+        email: data.email,
+      });
 
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update profile');
       }
 
       toast({
@@ -104,13 +100,11 @@ const Profile = () => {
     setPasswordUpdateLoading(true);
     try {
       console.log('Attempting to update password');
-      // Update password in Supabase Auth
-      const { error } = await supabase.auth.updateUser({
-        password: data.newPassword,
-      });
+      
+      const result = await authApi.updatePassword(data.newPassword);
 
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update password');
       }
 
       toast({

@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Sidebar, 
@@ -14,9 +13,8 @@ import {
   SidebarTrigger,
   useSidebar
 } from '@/components/ui/sidebar';
-import { AppWindow, Package2, Settings, LayoutDashboard, Shield, LibraryBig, Users, Plus, Search as SearchIcon } from 'lucide-react';
+import { AppWindow, Package2, Settings, LayoutDashboard, LibraryBig, Plus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
@@ -71,7 +69,7 @@ const AppSidebar = () => {
   };
 
   return (
-    <Sidebar collapsible="icon" className="">
+    <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader className="border-b">
         <div className="flex items-center gap-2 px-2 py-2">
           {state === "expanded" && (

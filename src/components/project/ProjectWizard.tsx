@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -10,7 +9,6 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { DynamicInputList, Item } from '@/components/ui/dynamic-input-list';
 import { Separator } from '@/components/ui/separator';
@@ -20,6 +18,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { reportsApi } from '@/utils/api';
 
 // Define the form schema
 const formSchema = z.object({
@@ -202,17 +201,12 @@ export const ProjectWizard = ({ isOpen, onClose }: ProjectWizardProps) => {
         return;
       }
 
-      // Otherwise proceed with regular project creation
-      const { data, error } = await supabase
-        .from('reports')
-        .insert([{
-          ...projectData,
-          created_by: user?.id,
-        }])
-        .select()
-        .single();
+      // Otherwise proceed with regular project creation using the API
+      const result = await reportsApi.create(projectData);
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create project');
+      }
 
       toast({
         title: 'Success',
@@ -220,7 +214,7 @@ export const ProjectWizard = ({ isOpen, onClose }: ProjectWizardProps) => {
       });
 
       // Navigate to the project details
-      navigate(`/projects/${data.id}`);
+      navigate(`/projects/${result.data?.id}`);
     } catch (error: any) {
       console.error('Error creating project:', error);
       toast({

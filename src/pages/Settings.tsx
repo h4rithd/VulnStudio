@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/lib/supabase';
 import {
   Table,
   TableBody,
@@ -24,13 +23,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DownloadCloud, UploadCloud, AlertTriangle, UserPlus, Edit2, Shield, FileText, Settings as SettingsIcon, Database, Globe, SlidersVertical } from 'lucide-react';
+import { DownloadCloud, UploadCloud, AlertTriangle, UserPlus, Shield, FileText, Settings as SettingsIcon, Database, Globe, SlidersVertical } from 'lucide-react';
 import { AddUserDialog } from '@/components/user-management/AddUserDialog';
 import { EditUserDialog } from '@/components/user-management/EditUserDialog';
 import { UserActionsDropdown } from '@/components/user-management/UserActionsDropdown';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { reportsApi } from '@/utils/api';
 
 interface User {
   id: string;
@@ -56,36 +56,23 @@ const Settings = () => {
     try {
       setExportLoading(true);
       
-      // Fetch data from all tables
-      const [usersRes, reportsRes, vulnRes, vulnDBRes, attachmentsRes] = await Promise.all([
-        supabase.from('users').select('*'),
-        supabase.from('reports').select('*'),
-        supabase.from('vulnerabilities').select('*'),
-        supabase.from('vulnDB').select('*'),
-        supabase.from('attachments').select('*'),
-      ]);
+      // Use the API to export the database
+      const result = await reportsApi.exportDatabase();
       
-      // Prepare export data
-      const exportData = {
-        users: usersRes.data,
-        reports: reportsRes.data,
-        vulnerabilities: vulnRes.data,
-        vulnDB: vulnDBRes.data,
-        attachments: attachmentsRes.data,
-        exportDate: new Date().toISOString(),
-        exportedBy: user?.id,
-      };
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to export database');
+      }
       
       // Create and download JSON file
-      const dataStr = JSON.stringify(exportData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `vulnstudio-export-${new Date().toISOString()}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
+      const blob = result.data as Blob;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `vulnstudio-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
       toast({
         title: 'Success',
@@ -133,43 +120,12 @@ const Settings = () => {
       
       // Read the JSON file
       const fileContent = await importData.text();
-      const importedData = JSON.parse(fileContent);
       
-      // Validate the imported data structure
-      const requiredTables = ['users', 'reports', 'vulnerabilities', 'vulnDB'];
-      for (const table of requiredTables) {
-        if (!importedData[table] || !Array.isArray(importedData[table])) {
-          throw new Error(`Invalid import file: ${table} data is missing or invalid`);
-        }
-      }
+      // Use the API to import the database
+      const result = await reportsApi.importDatabase(fileContent);
       
-      // Insert data into each table
-      const results = await Promise.all([
-        supabase.from('vulnDB').upsert(importedData.vulnDB.map((item: any) => ({
-          ...item,
-          created_at: new Date(item.created_at).toISOString(),
-          updated_at: item.updated_at ? new Date(item.updated_at).toISOString() : null
-        }))),
-        supabase.from('reports').upsert(importedData.reports.map((item: any) => ({
-          ...item,
-          created_at: new Date(item.created_at).toISOString(),
-          updated_at: item.updated_at ? new Date(item.updated_at).toISOString() : null
-        }))),
-        supabase.from('vulnerabilities').upsert(importedData.vulnerabilities.map((item: any) => ({
-          ...item,
-          created_at: new Date(item.created_at).toISOString(),
-          updated_at: item.updated_at ? new Date(item.updated_at).toISOString() : null
-        }))),
-        supabase.from('users').upsert(importedData.users.map((item: any) => ({
-          ...item,
-          created_at: new Date(item.created_at).toISOString()
-        }))),
-      ]);
-      
-      // Check for errors
-      const errors = results.filter(r => r.error).map(r => r.error);
-      if (errors.length > 0) {
-        throw new Error(`Import errors: ${errors.map(e => e?.message).join(', ')}`);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to import database');
       }
       
       toast({
@@ -227,26 +183,22 @@ const Settings = () => {
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <SlidersVertical className="h-10 w-10" />
             Settings
-          </h1>
+            </h1>
         <p className="text-muted-foreground">Configure application settings and manage users</p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
+      <Tabs defaultValue="users" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="general" className="flex items-center gap-2">
-            <SettingsIcon className="h-4 w-4" />
-            General
-          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />
             Users
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4" />
+            <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
           <TabsTrigger value="reports" className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Reports
           </TabsTrigger>
           <TabsTrigger value="data" className="flex items-center gap-2">
@@ -258,65 +210,6 @@ const Settings = () => {
             Integration
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="general" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Settings</CardTitle>
-              <CardDescription>
-                Configure general application settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Select defaultValue="UTC">
-                    <SelectTrigger id="timezone">
-                      <SelectValue placeholder="Select timezone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="UTC">UTC</SelectItem>
-                      <SelectItem value="GMT">GMT</SelectItem>
-                      <SelectItem value="EST">Eastern Time (EST)</SelectItem>
-                      <SelectItem value="CST">Central Time (CST)</SelectItem>
-                      <SelectItem value="PST">Pacific Time (PST)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="language">Default Language</Label>
-                  <Select defaultValue="en">
-                    <SelectTrigger id="language">
-                      <SelectValue placeholder="Select language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                      <SelectItem value="de">German</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="company-name">Company Name</Label>
-                <Input id="company-name" placeholder="Your Company Name" />
-              </div>
-
-              <div>
-                <Label htmlFor="company-logo">Company Logo URL</Label>
-                <Input id="company-logo" placeholder="https://vulnstudio.com/logo.png" />
-              </div>
-              
-              <div className="flex justify-end">
-                <Button>Save Changes</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
           <Card>
@@ -369,14 +262,14 @@ const Settings = () => {
                         <TableCell>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             userData.role === 'admin' 
-                              ? 'bg-blue-100 text-blue-800' 
+                              ? 'bg-[#5459AC]/10 text-[#5459AC]' 
                               : 'bg-gray-100 text-gray-800'
                           }`}>
                             {userData.role === 'admin' ? 'Admin' : 'Auditor'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#C95792]/10 text-[#C95792]">
                             Active
                           </span>
                         </TableCell>
@@ -384,7 +277,7 @@ const Settings = () => {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             userData.first_login 
                               ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
+                              : 'bg-[#E83F25]/10 text-[#E83F25]'
                           }`}>
                             {userData.first_login ? 'Completed' : 'Pending'}
                           </span>
@@ -434,7 +327,7 @@ const Settings = () => {
                     <SelectItem value="15">15 minutes</SelectItem>
                     <SelectItem value="30">30 minutes</SelectItem>
                     <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
+                    <SelectItem value="120">15 days</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

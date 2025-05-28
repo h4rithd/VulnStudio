@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase';
 
 export const useSetupCheck = () => {
   const [isSetupRequired, setIsSetupRequired] = useState<boolean | null>(null);

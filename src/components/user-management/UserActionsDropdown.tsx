@@ -1,4 +1,3 @@
-
 import { MoreHorizontal, Edit2, Trash2, Shield, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { usersApi } from '@/utils/api';
 
 interface User {
   id: string;
@@ -51,17 +51,19 @@ export const UserActionsDropdown = ({
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const result = await onDelete(user.id);
+      const result = await usersApi.delete(user.id);
       if (result.success) {
         toast({
           title: 'User deleted',
           description: `${user.name} has been removed from the system.`,
         });
         setShowDeleteDialog(false);
+        // Call the parent's onDelete to refresh the list
+        await onDelete(user.id);
       } else {
         toast({
           title: 'Error',
-          description: 'Failed to delete user. Please try again.',
+          description: result.error || 'Failed to delete user. Please try again.',
           variant: 'destructive',
         });
       }
@@ -79,16 +81,18 @@ export const UserActionsDropdown = ({
   const handleRoleToggle = async () => {
     const newRole = user.role === 'admin' ? 'auditor' : 'admin';
     try {
-      const result = await onRoleChange(user.id, newRole);
+      const result = await usersApi.updateRole(user.id, newRole);
       if (result.success) {
         toast({
           title: 'Role updated',
           description: `${user.name} is now ${newRole === 'admin' ? 'an admin' : 'an auditor'}.`,
         });
+        // Call the parent's onRoleChange to refresh the list
+        await onRoleChange(user.id, newRole);
       } else {
         toast({
           title: 'Error',
-          description: 'Failed to update user role. Please try again.',
+          description: result.error || 'Failed to update user role. Please try again.',
           variant: 'destructive',
         });
       }

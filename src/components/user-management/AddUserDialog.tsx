@@ -1,9 +1,7 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -30,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { edgeFunctionsApi } from '@/utils/api';
 
 const formSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -65,28 +64,13 @@ export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialog
     try {
       console.log('[AddUserDialog] Creating user with data:', { ...data, password: '[REDACTED]' });
 
-      // Call the create-admin-user edge function
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-admin-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          name: data.name,
-          role: data.role,
-        }),
-      });
+      const result = await edgeFunctionsApi.createAdminUser(data);
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         throw new Error(result.error || 'Failed to create user');
       }
 
-      console.log('[AddUserDialog] User created successfully:', result);
+      console.log('[AddUserDialog] User created successfully:', result.data);
 
       toast({
         title: 'Success',

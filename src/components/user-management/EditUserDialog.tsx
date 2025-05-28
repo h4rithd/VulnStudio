@@ -1,9 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -30,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { usersApi } from '@/utils/api';
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -84,35 +83,22 @@ export const EditUserDialog = ({ open, onOpenChange, user, onUserUpdated }: Edit
       console.log('[EditUserDialog] Updating user:', user.id, data);
 
       // Update user basic info
-      const { error: userError } = await supabase
-        .from('users')
-        .update({
-          name: data.name,
-          email: data.email,
-        })
-        .eq('id', user.id);
+      const userResult = await usersApi.update(user.id, {
+        name: data.name,
+        email: data.email,
+      });
 
-      if (userError) throw userError;
+      if (!userResult.success) {
+        throw new Error(userResult.error || 'Failed to update user');
+      }
 
-      // Update user role
+      // Update user role if changed
       if (data.role !== user.role) {
-        // Delete old role
-        const { error: deleteError } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', user.id);
-
-        if (deleteError) throw deleteError;
-
-        // Insert new role
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: user.id,
-            role: data.role,
-          });
-
-        if (insertError) throw insertError;
+        const roleResult = await usersApi.updateRole(user.id, data.role);
+        
+        if (!roleResult.success) {
+          throw new Error(roleResult.error || 'Failed to update user role');
+        }
       }
 
       console.log('[EditUserDialog] User updated successfully');

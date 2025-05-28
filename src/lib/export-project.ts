@@ -1,19 +1,20 @@
+
 import JSZip from 'jszip';
-import { supabase } from '@/utils/supabase';
+import { supabase } from '@/lib/supabase';
 
 // Function to export a project to JSON and images as a ZIP file
-export async function exportProjectToZip(projectId: string): Promise<Blob> {
+export async function exportProjectToZip(project: any): Promise<void> {
   try {
     // Check if this is a temporary project
-    if (projectId.startsWith('temp_')) {
-      return exportTemporaryProjectToZip(projectId);
+    if (project.id.startsWith('temp_')) {
+      return exportTemporaryProjectToZip(project);
     }
     
     // Fetch the project data
     const { data: projectData, error } = await supabase
       .from('reports')
       .select('*')
-      .eq('id', projectId)
+      .eq('id', project.id)
       .single();
     
     if (error) throw error;
@@ -23,7 +24,7 @@ export async function exportProjectToZip(projectId: string): Promise<Blob> {
     const { data: vulnerabilities, error: vulnError } = await supabase
       .from('vulnerabilities')
       .select('*')
-      .eq('report_id', projectId);
+      .eq('report_id', project.id);
       
     if (vulnError) throw vulnError;
     
@@ -73,7 +74,15 @@ To import this project back into the application, use the "Import Project" butto
       }
     });
     
-    return zipBlob;
+    // Download the file
+    const url = URL.createObjectURL(zipBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${projectData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_export.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     
   } catch (error) {
     console.error('Error exporting project:', error);
@@ -82,24 +91,11 @@ To import this project back into the application, use the "Import Project" butto
 }
 
 // Function to export a temporary project to a ZIP file
-function exportTemporaryProjectToZip(projectId: string): Promise<Blob> {
+function exportTemporaryProjectToZip(project: any): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
-      // Get project data from localStorage
-      const tempProjectsJSON = localStorage.getItem('tempProjects');
-      if (!tempProjectsJSON) {
-        throw new Error('No temporary projects found');
-      }
-      
-      const tempProjects = JSON.parse(tempProjectsJSON);
-      const project = tempProjects.find((p: any) => p.id === projectId);
-      
-      if (!project) {
-        throw new Error(`Temporary project with ID ${projectId} not found`);
-      }
-      
       // Get vulnerabilities for this project from localStorage
-      const vulnKey = `tempVulnerabilities_${projectId}`;
+      const vulnKey = `tempVulnerabilities_${project.id}`;
       const vulnJSON = localStorage.getItem(vulnKey);
       const vulnerabilities = vulnJSON ? JSON.parse(vulnJSON) : [];
       
@@ -133,9 +129,17 @@ To import this project back into the application, use the "Import Project" butto
           level: 9
         }
       }).then(blob => {
-        resolve(blob);
-      }).catch(error => {
-        reject(error);
+        // Download the file
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_export.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        resolve();
       });
       
     } catch (error) {

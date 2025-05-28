@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
-import { supabase } from '@/lib/supabase';
 import { Reports, Vulnerabilities } from '@/types/database.types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import { htmlToWord } from '@/lib/htmlToWord';
 import { Button } from '@/components/ui/button';
 import { exportProjectToZip } from '@/utils/projectExport';
 import { ReportPreview } from '@/components/report/ReportPreview';
+import { reportsApi, vulnerabilitiesApi } from '@/utils/api';
 
 const ReportView = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -31,25 +31,19 @@ const ReportView = () => {
         setIsLoading(true);
         
         // Fetch project details
-        const { data: projectData, error: projectError } = await supabase
-          .from('reports')
-          .select('*')
-          .eq('id', projectId)
-          .single();
-        
-        if (projectError) throw projectError;
-        setProjectData(projectData);
-        setProject(projectData);
+        const projectResult = await reportsApi.getById(projectId);
+        if (!projectResult.success) {
+          throw new Error(projectResult.error || 'Failed to load project data');
+        }
+        setProjectData(projectResult.data);
+        setProject(projectResult.data);
         
         // Fetch vulnerabilities
-        const { data: vulnData, error: vulnError } = await supabase
-          .from('vulnerabilities')
-          .select('*')
-          .eq('report_id', projectId)
-          .order('severity', { ascending: false });
-        
-        if (vulnError) throw vulnError;
-        setVulnerabilities(vulnData || []);
+        const vulnResult = await vulnerabilitiesApi.getByReportId(projectId);
+        if (!vulnResult.success) {
+          throw new Error(vulnResult.error || 'Failed to load vulnerabilities');
+        }
+        setVulnerabilities(vulnResult.data || []);
         
         // Check if we need to auto-download
         const downloadFormat = searchParams.get('download');
@@ -374,22 +368,6 @@ const ReportView = () => {
         const sev = vuln.severity.toLowerCase();
         if (!vulnsBySeverity[sev]) vulnsBySeverity[sev] = [];
         vulnsBySeverity[sev].push(vuln);
-      });
-      
-      // Create a map of vulnerability IDs
-      const vulnIdMap: Record<string, number> = {};
-      sortedVulns.forEach((vuln, idx) => {
-        const severity = vuln.severity.toLowerCase();
-        if (!vulnIdMap[severity]) vulnIdMap[severity] = 1;
-        else vulnIdMap[severity]++;
-
-        // Assign a unique ID if none exists
-        if (!vuln.vulnerability_id) {
-          const year = new Date().getFullYear().toString().substring(2);
-          const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-          const sevCode = severity.charAt(0).toUpperCase();
-          vuln.vulnerability_id = `APP.${sevCode}.${vulnIdMap[severity].toString().padStart(2, '0')}`;
-        }
       });
       
       // Calculate severity counts
