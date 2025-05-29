@@ -40,12 +40,12 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 interface AddUserDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  isOpen: boolean;
+  onClose: () => void;
   onUserAdded: () => void;
 }
 
-export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialogProps) => {
+export const AddUserDialog = ({ isOpen, onClose, onUserAdded }: AddUserDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -59,33 +59,42 @@ export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialog
     },
   });
 
-  const onSubmit = async (data: FormData) => {
-    setIsLoading(true);
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      console.log('[AddUserDialog] Creating user with data:', { ...data, password: '[REDACTED]' });
+      setIsLoading(true);
 
-      const result = await edgeFunctionsApi.createAdminUser(data);
+      // Ensure all required fields are present
+      const userData = {
+        email: values.email || '',
+        password: values.password || '',
+        name: values.name || '',
+        role: values.role || 'auditor'
+      };
 
+      // Validate that all required fields are provided
+      if (!userData.email || !userData.password || !userData.name || !userData.role) {
+        throw new Error('All fields are required');
+      }
+
+      const result = await edgeFunctionsApi.createAdminUser(userData);
+      
       if (!result.success) {
         throw new Error(result.error || 'Failed to create user');
       }
 
-      console.log('[AddUserDialog] User created successfully:', result.data);
-
       toast({
-        title: 'Success',
-        description: 'User created successfully',
+        title: "Success",
+        description: "User created successfully",
       });
 
       form.reset();
-      onOpenChange(false);
       onUserAdded();
+      onClose();
     } catch (error: any) {
-      console.error('[AddUserDialog] Error creating user:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to create user',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "Failed to create user",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -93,7 +102,7 @@ export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialog
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
@@ -164,7 +173,7 @@ export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialog
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onClose()}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>
@@ -177,3 +186,5 @@ export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialog
     </Dialog>
   );
 };
+
+export default AddUserDialog;

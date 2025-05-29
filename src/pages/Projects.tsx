@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
@@ -21,7 +22,6 @@ import {
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { Reports } from '@/types/database.types';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -48,16 +48,10 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import ProjectImportButton from '@/components/project/ProjectImportButton';
 import { DuplicateProjectDialog } from '@/components/project/DuplicateProjectDialog';
+import { reportsApi, VulnerabilityCount } from '@/utils/api';
 
 interface ProjectWithVulnerabilities extends Reports {
-  vulnerabilities_count?: {
-    total: number;
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    info: number;
-  };
+  vulnerabilities_count?: VulnerabilityCount;
   is_retest?: boolean;
   isTemporary?: boolean;
 }
@@ -74,7 +68,7 @@ interface TempProject {
   version: string;
   version_history: string;
   scope: Array<{ value: string }>;
-  status: string;
+  status: 'draft' | 'review' | 'completed' | 'archived';
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -119,47 +113,13 @@ const Projects = () => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const result = await reportsApi.getAll();
 
-      if (error) {
-        throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch projects');
       }
 
-      const projectsWithVulnCounts = await Promise.all((data || []).map(async (project) => {
-        // Get vulnerability counts for each project
-        const { data: vulnData, error: vulnError } = await supabase
-          .from('vulnerabilities')
-          .select('severity')
-          .eq('report_id', project.id);
-
-        if (vulnError) {
-          console.error("Error fetching vulnerabilities:", vulnError);
-          return project;
-        }
-
-        const vulnCounts = {
-          total: vulnData?.length || 0,
-          critical: vulnData?.filter(v => v.severity === 'critical').length || 0,
-          high: vulnData?.filter(v => v.severity === 'high').length || 0,
-          medium: vulnData?.filter(v => v.severity === 'medium').length || 0,
-          low: vulnData?.filter(v => v.severity === 'low').length || 0,
-          info: vulnData?.filter(v => v.severity === 'info').length || 0,
-        };
-
-        // Check if this is a retest project
-        const isRetest = project.title.startsWith('Re-test:');
-
-        return {
-          ...project,
-          vulnerabilities_count: vulnCounts,
-          is_retest: isRetest
-        };
-      }));
-
-      setProjects(projectsWithVulnCounts);
+      setProjects(result.data || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -205,7 +165,7 @@ const Projects = () => {
             isTemporary: true,
             updated_at: project.updated_at || project.created_at,
             created_by: project.created_by || 'temp-user'
-          };
+          } as ProjectWithVulnerabilities;
         });
         
         setTempProjects(tempProjectsWithVulns);
@@ -236,45 +196,17 @@ const Projects = () => {
 
   const handleDeleteProject = async (id: string) => {
     try {
-      // Check if it's a temporary project
+      const result = await reportsApi.delete(id);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete project');
+      }
+      
+      // Update the UI based on project type
       if (id.startsWith('temp_')) {
-        // Delete from localStorage
-        const tempProjectsJSON = localStorage.getItem('tempProjects');
-        if (tempProjectsJSON) {
-          const tempProjects = JSON.parse(tempProjectsJSON);
-          const updatedProjects = tempProjects.filter((p: any) => p.id !== id);
-          localStorage.setItem('tempProjects', JSON.stringify(updatedProjects));
-          
-          // Delete vulnerabilities
-          localStorage.removeItem(`tempVulnerabilities_${id}`);
-          
-          // Update state
-          setTempProjects(prev => prev.filter(p => p.id !== id));
-        }
+        setTempProjects(prev => prev.filter(p => p.id !== id));
       } else {
-        // Delete from supabase
-        // First, delete all vulnerabilities related to this report
-        const { error: vulnError } = await supabase
-          .from('vulnerabilities')
-          .delete()
-          .eq('report_id', id);
-
-        if (vulnError) {
-          throw vulnError;
-        }
-
-        // Then delete the report itself
-        const { error } = await supabase
-          .from('reports')
-          .delete()
-          .eq('id', id);
-
-        if (error) {
-          throw error;
-        }
-
-        // Update the UI
-        setProjects(projects.filter(project => project.id !== id));
+        setProjects(prev => prev.filter(p => p.id !== id));
       }
       
       toast({
@@ -294,39 +226,20 @@ const Projects = () => {
 
   const markProjectAsCompleted = async (projectId: string) => {
     try {
+      const result = await reportsApi.update(projectId, { status: 'completed' });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update project status');
+      }
+
+      // Update the local state
       if (projectId.startsWith('temp_')) {
-        // Update temporary project status
-        const tempProjectsJSON = localStorage.getItem('tempProjects');
-        if (tempProjectsJSON) {
-          const tempProjects = JSON.parse(tempProjectsJSON);
-          const updatedProjects = tempProjects.map((p: any) => {
-            if (p.id === projectId) {
-              return { ...p, status: 'completed' };
-            }
-            return p;
-          });
-          
-          localStorage.setItem('tempProjects', JSON.stringify(updatedProjects));
-          
-          // Update state
-          setTempProjects(prev => prev.map(p => 
-            p.id === projectId ? { ...p, status: 'completed' } : p
-          ));
-        }
+        setTempProjects(prev => prev.map(p => 
+          p.id === projectId ? { ...p, status: 'completed' } : p
+        ));
       } else {
-        // Update cloud project status
-        const { error } = await supabase
-          .from('reports')
-          .update({ status: 'completed' })
-          .eq('id', projectId);
-
-        if (error) throw error;
-
-        // Update the local projects list
-        setProjects(projects.map(project =>
-          project.id === projectId
-            ? { ...project, status: 'completed' }
-            : project
+        setProjects(prev => prev.map(p =>
+          p.id === projectId ? { ...p, status: 'completed' } : p
         ));
       }
 
@@ -348,7 +261,7 @@ const Projects = () => {
 
     try {
       if (projectToDuplicate.isTemporary) {
-        // Duplicate temporary project
+        // Handle temporary project duplication
         const tempProjectsJSON = localStorage.getItem('tempProjects');
         if (tempProjectsJSON) {
           const tempProjects = JSON.parse(tempProjectsJSON);
@@ -359,7 +272,7 @@ const Projects = () => {
             id: `temp_${Math.random().toString(36).substr(2, 16)}`,
             title: projectTitle,
             version: version,
-            status: 'draft',
+            status: 'draft' as const,
             created_at: new Date().toISOString()
           };
           
@@ -395,52 +308,11 @@ const Projects = () => {
           loadTemporaryProjects();
         }
       } else {
-        // Duplicate cloud project
-        const { data: newProject, error: projectError } = await supabase
-          .from('reports')
-          .insert({
-            title: projectTitle,
-            version: version,
-            start_date: projectToDuplicate.start_date,
-            end_date: projectToDuplicate.end_date,
-            preparer: projectToDuplicate.preparer,
-            reviewer: projectToDuplicate.reviewer,
-            scope: projectToDuplicate.scope,
-            status: 'draft',
-            created_by: projectToDuplicate.created_by
-          })
-          .select()
-          .single();
-
-        if (projectError) throw projectError;
-
-        // Fetch vulnerabilities from the original project
-        const { data: originalVulns, error: vulnFetchError } = await supabase
-          .from('vulnerabilities')
-          .select('*')
-          .eq('report_id', projectToDuplicate.id);
-
-        if (vulnFetchError) throw vulnFetchError;
-
-        // If there are vulnerabilities, duplicate them for the new project
-        if (originalVulns && originalVulns.length > 0 && newProject) {
-          // Create a new array with spread operators instead of directly modifying the objects
-          const newVulnerabilities = originalVulns.map(vuln => {
-            // Create a new object without the id field
-            const { id, ...vulnWithoutId } = vuln;
-            return {
-              ...vulnWithoutId,
-              report_id: newProject.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-          });
-
-          const { error: vulnInsertError } = await supabase
-            .from('vulnerabilities')
-            .insert(newVulnerabilities);
-
-          if (vulnInsertError) throw vulnInsertError;
+        // Handle cloud project duplication
+        const result = await reportsApi.duplicateProject(projectToDuplicate.id, projectTitle, version, type);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to duplicate project');
         }
         
         // Refresh projects list

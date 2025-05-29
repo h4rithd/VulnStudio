@@ -767,7 +767,7 @@ export const vulnerabilitiesApi = {
   }
 };
 
-// VulnDB API
+// VulnDB API - Export as vulnDbApi to match existing usage
 export const vulnDbApi = {
   async search(searchTerm: string, limit: number = 10): Promise<ApiResponse<VulnDB[]>> {
     try {
@@ -867,6 +867,9 @@ export const vulnDbApi = {
     }
   }
 };
+
+// Export vulndbApi as an alias for backward compatibility
+export const vulndbApi = vulnDbApi;
 
 // Users API
 export const usersApi = {
@@ -971,6 +974,29 @@ export const usersApi = {
     } catch (error: any) {
       return { error: error.message, success: false };
     }
+  },
+
+  async createAdmin(userData: { email: string; password: string; name: string; role: string }): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`https://***.supabase.co/functions/v1/create-admin-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ****`,
+        },
+        body: JSON.stringify(userData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create user');
+      }
+
+      return { data: result, success: true };
+    } catch (error: any) {
+      return { error: error.message, success: false };
+    }
   }
 };
 
@@ -1030,11 +1056,11 @@ export const attachmentsApi = {
 export const edgeFunctionsApi = {
   async createAdminUser(userData: { email: string; password: string; name: string; role: string }): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`https://dzqaszkmmxafenqujsyv.supabase.co/functions/v1/create-admin-user`, {
+      const response = await fetch(`https://***.supabase.co/functions/v1/create-admin-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cWFzemttbXhhZmVucXVqc3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQ0ODEsImV4cCI6MjA2MjEzMDQ4MX0.rjqJXrI4JK3Hbqs4XiIun69DCp50WJMrTQN8dBwB0qE`,
+          'Authorization': `Bearer ***`,
         },
         body: JSON.stringify(userData),
       });
