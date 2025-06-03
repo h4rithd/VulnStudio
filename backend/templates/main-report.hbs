@@ -1,0 +1,1027 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{project.title}} - Penetration Test Report</title>
+    <style>
+        /* Print-specific styles */
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        /* Page setup */
+        @page {
+            size: A4;
+            margin: 25mm 20mm;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #2c3e50;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+
+        /* Page break controls */
+        .page-break {
+            page-break-before: always;
+        }
+
+        .page-break-after {
+            page-break-after: always;
+        }
+
+        .no-break {
+            page-break-inside: avoid;
+        }
+
+        /* Headers */
+        h1 {
+            color: #2c3e50;
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 20px 0 10px 0;
+        }
+
+        h3 {
+            color: #34495e;
+            font-size: 12pt;
+            font-weight: bold;
+            margin: 15px 0 8px 0;
+        }
+
+        /* Cover page */
+        .cover-page {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            page-break-after: always;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: -25mm -20mm;
+            padding: 25mm 20mm;
+        }
+
+        .cover-title {
+            font-size: 42pt;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .cover-subtitle {
+            font-size: 24pt;
+            margin-bottom: 50px;
+            font-weight: 300;
+        }
+
+        .cover-scope {
+            font-size: 16pt;
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .cover-meta {
+            font-size: 14pt;
+            margin-top: 50px;
+        }
+
+        /* Disclaimer page */
+        .disclaimer-page {
+            page-break-after: always;
+            padding-top: 50px;
+        }
+
+        .disclaimer-title {
+            text-align: center;
+            color: #e74c3c;
+            font-size: 24pt;
+            margin-bottom: 40px;
+        }
+
+        .disclaimer-content {
+            background: #f8f9fa;
+            padding: 30px;
+            border-left: 5px solid #e74c3c;
+            line-height: 1.6;
+            font-size: 11pt;
+        }
+
+        .disclaimer-highlight {
+            background: #fff3cd;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        /* Document control */
+        .document-control {
+            page-break-after: always;
+            padding-top: 20px;
+        }
+
+        .control-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .control-table th {
+            background: #34495e;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            width: 30%;
+        }
+
+        .control-table td {
+            background: #ecf0f1;
+            padding: 15px;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        /* Table of Contents */
+        .toc {
+            page-break-after: always;
+            padding-top: 20px;
+        }
+
+        .toc-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px dotted #bdc3c7;
+            font-size: 11pt;
+        }
+
+        .toc-item:hover {
+            background: #f8f9fa;
+        }
+
+        .toc-title {
+            flex-grow: 1;
+            color: #2c3e50;
+        }
+
+        .toc-page {
+            margin-left: 20px;
+            color: #7f8c8d;
+            font-weight: bold;
+            min-width: 30px;
+        }
+
+        .toc-subsection {
+            margin-left: 20px;
+            font-size: 10pt;
+            color: #7f8c8d;
+        }
+
+        /* Executive Summary */
+        .executive-summary {
+            page-break-after: always;
+            padding-top: 20px;
+        }
+
+        .section-number {
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 14pt;
+        }
+
+        .charts-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 30px 0;
+            page-break-inside: avoid;
+        }
+
+        .chart-wrapper {
+            text-align: center;
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .chart-title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .chart-image {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #bdc3c7;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Scope table */
+        .scope-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .scope-table th {
+            background: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .scope-table td {
+            padding: 12px;
+            border-bottom: 1px solid #ecf0f1;
+            background: #f8f9fa;
+        }
+
+        /* CVSS Risk table */
+        .cvss-risk-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .cvss-risk-table th {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .cvss-risk-table td {
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .risk-critical { background: #e74c3c; color: white; }
+        .risk-high { background: #f39c12; color: white; }
+        .risk-medium { background: #f1c40f; color: #2c3e50; }
+        .risk-low { background: #27ae60; color: white; }
+        .risk-info { background: #3498db; color: white; }
+
+        /* Vulnerability Spotlight */
+        .vulnerability-spotlight {
+            page-break-after: always;
+            padding-top: 20px;
+        }
+
+        .spotlight-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .spotlight-table th {
+            background: #2c3e50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+
+        .spotlight-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 10pt;
+        }
+
+        .spotlight-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        /* Severity badges */
+        .severity-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 9pt;
+            display: inline-block;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .severity-critical { background: #e74c3c; }
+        .severity-high { background: #f39c12; }
+        .severity-medium { background: #f1c40f; color: #2c3e50; }
+        .severity-low { background: #27ae60; }
+        .severity-info { background: #3498db; }
+
+        /* Detailed Findings */
+        .vulnerability-detail {
+            page-break-before: always;
+            padding-top: 20px;
+        }
+
+        .vuln-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            margin: -20px -20px 30px -20px;
+            border-radius: 0;
+        }
+
+        .vuln-title {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .vuln-id {
+            font-size: 12pt;
+            opacity: 0.9;
+        }
+
+        .vuln-severity-header {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .vuln-section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+
+        .vuln-section-title {
+            color: #2c3e50;
+            font-size: 13pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding: 8px 15px;
+            background: #ecf0f1;
+            border-left: 4px solid #3498db;
+        }
+
+        .vuln-content {
+            padding: 0 15px;
+            line-height: 1.5;
+            text-align: justify;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 9pt;
+            overflow-x: auto;
+            page-break-inside: avoid;
+            white-space: pre-wrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Images */
+        .poc-image {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #bdc3c7;
+            border-radius: 5px;
+            margin: 15px 0;
+            page-break-inside: avoid;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .image-caption {
+            text-align: center;
+            font-style: italic;
+            color: #7f8c8d;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            font-size: 10pt;
+            background: #f8f9fa;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        /* Affected versions table */
+        .affected-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            page-break-inside: avoid;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .affected-table th {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .affected-table td {
+            background: #f8f9fa;
+            padding: 10px;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        /* Risk rating */
+        .risk-rating {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            page-break-inside: avoid;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .cvss-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .cvss-chart {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+        }
+
+        .cvss-details {
+            flex: 1;
+        }
+
+        .cvss-vector {
+            font-family: 'Courier New', monospace;
+            background: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            word-break: break-all;
+            font-size: 9pt;
+        }
+
+        /* References */
+        .references-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .references-list li {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+
+        .references-list a {
+            color: #3498db;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        /* Retest section */
+        .retest-section {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+
+        .retest-title {
+            color: #155724;
+            font-weight: bold;
+            font-size: 12pt;
+            margin-bottom: 10px;
+        }
+
+        /* Conclusion */
+        .conclusion {
+            page-break-before: always;
+            padding-top: 50px;
+            text-align: center;
+        }
+
+        .conclusion-content {
+            text-align: justify;
+            margin: 30px 0;
+            line-height: 1.6;
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Technical Report Section */
+        .technical-report {
+            page-break-after: always;
+            padding-top: 20px;
+        }
+
+        .methodology-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 5px solid #3498db;
+        }
+
+        /* Utility classes */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-justify { text-align: justify; }
+        .mb-1 { margin-bottom: 5px; }
+        .mb-2 { margin-bottom: 10px; }
+        .mb-3 { margin-bottom: 15px; }
+        .mt-1 { margin-top: 5px; }
+        .mt-2 { margin-top: 10px; }
+        .mt-3 { margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <!-- Cover Page -->
+    <div class="cover-page">
+        <h1 class="cover-title">Penetration Test Report</h1>
+        <div class="cover-subtitle">{{project.title}}</div>
+        <div class="cover-scope">
+            <strong>Scope:</strong> {{#if project.scope}}{{#each project.scope}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}{{project.title}}{{/if}}
+        </div>
+        <div class="cover-meta">
+            <p><strong>Generated on:</strong> {{formatDate metadata.generatedDate}}</p>
+            <p><strong>Report Version:</strong> {{metadata.docVersion}}</p>
+        </div>
+    </div>
+
+    <!-- Disclaimer Page -->
+    <div class="disclaimer-page">
+        <h1 class="disclaimer-title">DISCLAIMER</h1>
+        <div class="disclaimer-content">
+            <p>The information shared in this report is <span class="disclaimer-highlight">confidential</span> and may be <span class="disclaimer-highlight">legally privileged</span>. It is intended solely for the addressee only and access to this report by anyone else is unauthorized.</p>
+            
+            <p>If you are not the intended recipient, any disclosure, copying, reproduction, distribution, or any action taken or omitted to be taken in reliance on it, is <span class="disclaimer-highlight">prohibited and may be unlawful</span>.</p>
+            
+            <p>The security team will not be liable to you in respect of any losses arising out of any event or events beyond our reasonable control. We will not be liable to you in respect of any business losses, including without limitation loss of or damage to profits, income, revenue, use, production, anticipated savings, business, contracts, commercial opportunities, or goodwill.</p>
+            
+            <p>All the recommendations and solutions provided in this report are on <span class="disclaimer-highlight">"as is" basis</span> and are void of any warranty expressed or implied.</p>
+        </div>
+    </div>
+
+    <!-- Document Control -->
+    <div class="document-control">
+        <h1>Document Control</h1>
+        <table class="control-table">
+            <tr>
+                <th>Document Version:</th>
+                <td>{{metadata.docVersion}}</td>
+            </tr>
+            <tr>
+                <th>Released on:</th>
+                <td>{{metadata.releaseDate}}</td>
+            </tr>
+            <tr>
+                <th>Author:</th>
+                <td>{{metadata.authorName}}</td>
+            </tr>
+            <tr>
+                <th>Email:</th>
+                <td>{{metadata.authorEmail}}</td>
+            </tr>
+        </table>
+
+        <h2>Amendment History</h2>
+        <table class="control-table">
+            <thead>
+                <tr>
+                    <th>Document Version</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{metadata.docVersion}}</td>
+                    <td>{{metadata.releaseDate}}</td>
+                    <td>Initial Report</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="toc">
+        <h1>Table of Contents</h1>
+        <div class="toc-item">
+            <span class="toc-title"><strong>1. Executive Summary</strong></span>
+            <span class="toc-page">5</span>
+        </div>
+        <div class="toc-item toc-subsection">
+            <span class="toc-title">1.1 Overview</span>
+            <span class="toc-page">5</span>
+        </div>
+        <div class="toc-item toc-subsection">
+            <span class="toc-title">1.2 Scope and Objectives</span>
+            <span class="toc-page">5</span>
+        </div>
+        <div class="toc-item toc-subsection">
+            <span class="toc-title">1.3 CVSS Risk Analysis</span>
+            <span class="toc-page">6</span>
+        </div>
+        <div class="toc-item toc-subsection">
+            <span class="toc-title">1.4 Vulnerability Spotlight</span>
+            <span class="toc-page">6</span>
+        </div>
+        <div class="toc-item">
+            <span class="toc-title"><strong>2. Technical Report</strong></span>
+            <span class="toc-page">7</span>
+        </div>
+        <div class="toc-item">
+            <span class="toc-title"><strong>3. Detailed Findings</strong></span>
+            <span class="toc-page">8</span>
+        </div>
+        {{#each vulnerabilities}}
+        <div class="toc-item toc-subsection">
+            <span class="toc-title">3.{{add @index 1}} {{vulnerability_id}}: {{title}}</span>
+            <span class="toc-page">{{add @index 8}}</span>
+        </div>
+        {{/each}}
+        <div class="toc-item">
+            <span class="toc-title"><strong>4. Conclusion</strong></span>
+            <span class="toc-page">{{add vulnerabilities.length 8}}</span>
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="executive-summary">
+        <h1><span class="section-number">1.</span> Executive Summary</h1>
+        
+        <h2><span class="section-number">1.1</span> Overview</h2>
+        <p>This penetration testing report presents the findings of a comprehensive security assessment conducted on <strong>{{project.title}}</strong>. The assessment was performed between <strong>{{formatDate project.start_date}}</strong> and <strong>{{formatDate project.end_date}}</strong> by the security testing team.</p>
+        
+        <p>During this assessment, a total of <strong>{{stats.total}} vulnerabilities</strong> were identified, with <strong class="severity-critical">{{stats.critical}} critical</strong>, <strong class="severity-high">{{stats.high}} high</strong>, <strong class="severity-medium">{{stats.medium}} medium</strong>, <strong class="severity-low">{{stats.low}} low</strong>, and <strong class="severity-info">{{stats.info}} informational</strong> severity issues.</p>
+
+        <h2><span class="section-number">1.2</span> Scope and Objectives</h2>
+        <table class="scope-table">
+            <tr>
+                <th>Assessment Type</th>
+                <td>Penetration Testing</td>
+            </tr>
+            <tr>
+                <th>Target Application</th>
+                <td>{{project.title}}</td>
+            </tr>
+            <tr>
+                <th>Assessment Period</th>
+                <td>{{formatDate project.start_date}} to {{formatDate project.end_date}}</td>
+            </tr>
+            <tr>
+                <th>Total Vulnerabilities</th>
+                <td>{{stats.total}}</td>
+            </tr>
+        </table>
+
+        <div class="charts-container">
+            <div class="chart-wrapper">
+                <div class="chart-title">Risk Profile Distribution</div>
+                <img src="{{charts.riskProfile}}" alt="Risk Profile Chart" class="chart-image">
+            </div>
+            <div class="chart-wrapper">
+                <div class="chart-title">Vulnerability Status</div>
+                <img src="{{charts.status}}" alt="Status Chart" class="chart-image">
+            </div>
+        </div>
+
+        <h2><span class="section-number">1.3</span> CVSS Risk Analysis</h2>
+        <table class="cvss-risk-table">
+            <thead>
+                <tr>
+                    <th>Risk Level</th>
+                    <th>CVSS Score Range</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="risk-critical">
+                    <td><strong>Critical</strong></td>
+                    <td>9.0 - 10.0</td>
+                    <td>{{stats.critical}}</td>
+                    <td>{{percentage stats.critical stats.total}}%</td>
+                </tr>
+                <tr class="risk-high">
+                    <td><strong>High</strong></td>
+                    <td>7.0 - 8.9</td>
+                    <td>{{stats.high}}</td>
+                    <td>{{percentage stats.high stats.total}}%</td>
+                </tr>
+                <tr class="risk-medium">
+                    <td><strong>Medium</strong></td>
+                    <td>4.0 - 6.9</td>
+                    <td>{{stats.medium}}</td>
+                    <td>{{percentage stats.medium stats.total}}%</td>
+                </tr>
+                <tr class="risk-low">
+                    <td><strong>Low</strong></td>
+                    <td>0.1 - 3.9</td>
+                    <td>{{stats.low}}</td>
+                    <td>{{percentage stats.low stats.total}}%</td>
+                </tr>
+                <tr class="risk-info">
+                    <td><strong>Info</strong></td>
+                    <td>0.0</td>
+                    <td>{{stats.info}}</td>
+                    <td>{{percentage stats.info stats.total}}%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2><span class="section-number">1.4</span> Vulnerability Spotlight</h2>
+        <p>The following table highlights the critical and high severity vulnerabilities that require immediate attention:</p>
+        
+        <table class="spotlight-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Vulnerability</th>
+                    <th>Severity</th>
+                    <th>CVSS</th>
+                    <th>Status</th>
+                    <th>Impact</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each vulnerabilities}}
+                {{#if (gt cvss_score 6.9)}}
+                <tr>
+                    <td><strong>{{vulnerability_id}}</strong></td>
+                    <td>{{title}}</td>
+                    <td>
+                        <span class="severity-badge severity-{{severity}}">
+                            {{severity}}
+                        </span>
+                    </td>
+                    <td><strong>{{cvss_score}}</strong></td>
+                    <td>{{#if current_status}}Open{{else}}Closed{{/if}}</td>
+                    <td>{{#if (eq severity 'critical')}}Complete system compromise{{/if}}{{#if (eq severity 'high')}}Significant data exposure{{/if}}</td>
+                </tr>
+                {{/if}}
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Technical Report -->
+    <div class="technical-report">
+        <h1><span class="section-number">2.</span> Technical Report</h1>
+        
+        <h2><span class="section-number">2.1</span> Engagement Methodology</h2>
+        <div class="methodology-section">
+            <p>The penetration testing engagement followed industry-standard methodologies including:</p>
+            <ul>
+                <li><strong>Reconnaissance:</strong> Information gathering and target enumeration</li>
+                <li><strong>Vulnerability Assessment:</strong> Automated and manual security testing</li>
+                <li><strong>Exploitation:</strong> Proof-of-concept development and testing</li>
+                <li><strong>Post-Exploitation:</strong> Impact assessment and privilege escalation</li>
+                <li><strong>Reporting:</strong> Documentation of findings and remediation guidance</li>
+            </ul>
+        </div>
+
+        <h2><span class="section-number">2.2</span> Risk Assessment</h2>
+        <p>Risk levels are determined using the Common Vulnerability Scoring System (CVSS) v3.1, which provides a standardized method for rating the severity of security vulnerabilities.</p>
+    </div>
+
+    <!-- Detailed Findings -->
+    {{#each vulnerabilities}}
+    <div class="vulnerability-detail">
+        <div class="vuln-header">
+            <div class="vuln-title">3.{{add @index 1}} {{title}}</div>
+            <div class="vuln-id">{{vulnerability_id}}</div>
+            <div class="vuln-severity-header severity-{{severity}}">
+                {{severity}} ({{cvss_score}})
+            </div>
+        </div>
+
+        <!-- A. Issue Background -->
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">A. Issue Background</h2>
+            <div class="vuln-content">
+                {{#if background}}
+                    {{{background}}}
+                {{else}}
+                    <p>This vulnerability represents a security weakness that could potentially be exploited by an attacker to compromise the security of the system.</p>
+                {{/if}}
+            </div>
+        </div>
+
+        <!-- B. Affected Hosts/Versions -->
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">B. Affected Hosts/Versions</h2>
+            {{#if affected_versions.length}}
+            <table class="affected-table">
+                <thead>
+                    <tr>
+                        <th>Host/Component</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each affected_versions}}
+                    <tr>
+                        <td>{{this.host}}</td>
+                        <td>{{this.version}}</td>
+                        <td>Vulnerable</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="vuln-content">
+                <p>All tested components of {{../project.title}} were found to be affected by this vulnerability.</p>
+            </div>
+            {{/if}}
+        </div>
+
+        <!-- C. Issue Detail -->
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">C. Issue Detail</h2>
+            <div class="vuln-content">
+                {{#if details}}
+                    {{{details}}}
+                {{else}}
+                    <p>Detailed technical information about this vulnerability is provided in the assessment documentation.</p>
+                {{/if}}
+            </div>
+
+            <!-- PoC Images -->
+            {{#if poc_images.length}}
+            <div class="mt-2">
+                <h3>Proof of Concept Evidence:</h3>
+                {{#each poc_images}}
+                <div class="no-break">
+                    <img src="{{this.url}}" alt="PoC Image {{add @index 1}}" class="poc-image" onerror="this.style.display='none'">
+                    <div class="image-caption">Figure {{add @index 1}}: {{this.caption}}</div>
+                </div>
+                {{/each}}
+            </div>
+            {{/if}}
+
+            <!-- Request/Response Blocks -->
+            {{#if request_response.request}}
+            <div class="mt-2">
+                <h3>HTTP Request:</h3>
+                <pre class="code-block">{{request_response.request}}</pre>
+            </div>
+            {{/if}}
+
+            {{#if request_response.response}}
+            <div class="mt-2">
+                <h3>HTTP Response:</h3>
+                <pre class="code-block">{{request_response.response}}</pre>
+            </div>
+            {{/if}}
+        </div>
+
+        <!-- D. Remediation -->
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">D. Remediation</h2>
+            <div class="vuln-content">
+                {{#if remediation}}
+                    {{{remediation}}}
+                {{else}}
+                    <p>Implement appropriate security controls to address this vulnerability. Consult with security experts for specific remediation guidance.</p>
+                {{/if}}
+            </div>
+        </div>
+
+        <!-- E. Risk Rating -->
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">E. Risk Rating</h2>
+            <div class="risk-rating">
+                <div class="cvss-container">
+                    {{#if cvssChart}}
+                    <img src="{{cvssChart}}" alt="CVSS Chart" class="cvss-chart">
+                    {{/if}}
+                    <div class="cvss-details">
+                        <p><strong>CVSS Score:</strong> <span class="severity-badge severity-{{severity}}">{{cvss_score}}/10.0 ({{severity}})</span></p>
+                        {{#if cvss_vector}}
+                        <p><strong>CVSS Vector:</strong></p>
+                        <div class="cvss-vector">{{cvss_vector}}</div>
+                        {{/if}}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- F. References -->
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">F. References</h2>
+            <div class="vuln-content">
+                {{#if ref_links.length}}
+                <ul class="references-list">
+                    {{#each ref_links}}
+                    <li><a href="{{this}}" target="_blank">{{this}}</a></li>
+                    {{/each}}
+                </ul>
+                {{else}}
+                <p>Additional reference materials and security advisories can be found in standard vulnerability databases such as CVE, OWASP, and vendor security bulletins.</p>
+                {{/if}}
+            </div>
+        </div>
+
+        <!-- G. Re-test Result (Conditional) -->
+        {{#if retest_date}}
+        <div class="vuln-section">
+            <h2 class="vuln-section-title">G. Re-test Result</h2>
+            <div class="retest-section">
+                <div class="retest-title">✓ Re-test Information</div>
+                <p><strong>Date:</strong> {{formatDate retest_date}}</p>
+                {{#if retest_result}}
+                <p><strong>Result:</strong> {{retest_result}}</p>
+                {{/if}}
+                
+                {{#if retest_images.length}}
+                <div class="mt-2">
+                    <h4>Re-test Evidence:</h4>
+                    {{#each retest_images}}
+                    <div class="no-break">
+                        <img src="{{this.url}}" alt="Retest Image {{add @index 1}}" class="poc-image" onerror="this.style.display='none'">
+                        <div class="image-caption">Re-test Figure {{add @index 1}}: {{this.caption}}</div>
+                    </div>
+                    {{/each}}
+                </div>
+                {{/if}}
+            </div>
+        </div>
+        {{/if}}
+    </div>
+    {{/each}}
+
+    <!-- Conclusion -->
+    <div class="conclusion">
+        <h1><span class="section-number">4.</span> Conclusion</h1>
+        <div class="conclusion-content">
+            <p>This penetration testing engagement has identified <strong>{{stats.total}} vulnerabilities</strong> across various severity levels. The assessment reveals that immediate attention should be given to the <strong>{{stats.critical}} critical</strong> and <strong>{{stats.high}} high</strong> severity vulnerabilities to significantly reduce the overall security risk.</p>
+            
+            <p><strong>Key Recommendations:</strong></p>
+            <ul>
+                <li>Prioritize remediation of critical and high severity vulnerabilities</li>
+                <li>Implement a regular vulnerability assessment program</li>
+                <li>Establish secure development practices and security testing procedures</li>
+                <li>Conduct security awareness training for development and operations teams</li>
+                <li>Schedule follow-up testing to verify remediation effectiveness</li>
+            </ul>
+
+            <p>It is recommended that the organization addresses these findings systematically, starting with the highest severity issues and implementing comprehensive security controls to prevent similar vulnerabilities in the future.</p>
+        </div>
+        
+        <div class="mt-3">
+            <p><strong>Report prepared by:</strong> {{metadata.authorName}}</p>
+            <p><strong>Date:</strong> {{metadata.releaseDate}}</p>
+            <p><strong>Version:</strong> {{metadata.docVersion}}</p>
+        </div>
+    </div>
+</body>
+</html>

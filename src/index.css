@@ -1,0 +1,131 @@
+@import "@fontsource/open-sans";
+@import "@fontsource/open-sans/300.css";
+@import "@fontsource/open-sans/400.css"; 
+
+@import "@fontsource/carlito"; 
+@import "@fontsource/carlito/400.css"; 
+@import "@fontsource/carlito/700.css"; 
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+ 
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+ 
+    --primary: 90 45% 63%;  /* #9cca77 */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+ 
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 94 44% 63%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 90 45% 63%;  /* #9cca77 */
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 94 44% 63%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 240 10% 11%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 11%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 11%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 240 10% 11%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 94 44% 63%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 94 44% 63%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 94 44% 63%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .vulnstudio-card {
+    @apply bg-card text-card-foreground rounded-lg border shadow-sm p-6;
+  }
+
+  .severity-badge-critical {
+    @apply bg-severity-critical text-white rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .severity-badge-high {
+    @apply bg-severity-high text-white rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .severity-badge-medium {
+    @apply bg-severity-medium text-white rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .severity-badge-low {
+    @apply bg-severity-low text-white rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .severity-badge-info {
+    @apply bg-severity-info text-white rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}
